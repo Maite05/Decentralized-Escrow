@@ -1,0 +1,18 @@
+{
+  "name": "@decentralized-escrow/contracts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.ts --network polygonMumbai",
+    "verify": "hardhat run scripts/verify.ts --network polygonMumbai",
+    "sync-abis": "hardhat run scripts/sync-abis.ts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "dotenv": "^16.0.0",
+    "hardhat": "^2.28.6"
+  }
+}
