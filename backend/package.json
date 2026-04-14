@@ -15,7 +15,7 @@
   "license": "ISC",
   "dependencies": {
     "@okx-dex/okx-dex-sdk": "latest",
-    "@okx/onchainos-skills": "latest",
+    "@okx/onchainos-sdk": "latest",
     "@prisma/client": "^5.0.0",
     "bullmq": "^5.73.5",
     "cors": "^2.8.5",
