@@ -81,6 +81,16 @@ export function useEscrowWrite(escrowAddress?: `0x${string}`) {
     });
   }
 
+  /** Client adds a new milestone to an already-deployed escrow. */
+  function addMilestone(amount: bigint, description: string): void {
+    writeContract({
+      address: requireEscrow(),
+      abi: ESCROW_ABI,
+      functionName: "addMilestone",
+      args: [amount, description],
+    });
+  }
+
   /** Either party opens a dispute on a milestone. */
   function raiseDispute(milestoneId: bigint): void {
     writeContract({
@@ -94,6 +104,7 @@ export function useEscrowWrite(escrowAddress?: `0x${string}`) {
   return {
     approveUSDC,
     createProject,
+    addMilestone,
     markDelivered,
     approveMilestone,
     raiseDispute,

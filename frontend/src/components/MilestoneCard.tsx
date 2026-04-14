@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
 import { useEscrowWrite } from "../hooks/useEscrowWrite";
-import { syncMilestoneAction } from "../lib/backendSync";
+import { syncMilestoneAction, syncDisputeRaised } from "../lib/backendSync";
 
 /** Mirror of the Solidity State enum (0-indexed). */
 const STATE_LABELS = [
@@ -45,8 +45,8 @@ export function MilestoneCard({
   const { markDelivered, approveMilestone, raiseDispute, isPending, isConfirming, isConfirmed } =
     useEscrowWrite(escrowAddress);
 
-  // Track which action was last triggered so we know what to sync on confirmation
-  const pendingAction = useRef<"deliver" | "approve" | null>(null);
+  // Track the last triggered action so the confirmation handler knows what to sync
+  const pendingAction = useRef<"deliver" | "approve" | "dispute" | null>(null);
 
   const isClient = address?.toLowerCase() === clientAddress.toLowerCase();
   const isFreelancer = address?.toLowerCase() === freelancerAddress.toLowerCase();
@@ -59,20 +59,20 @@ export function MilestoneCard({
     maximumFractionDigits: 6,
   });
 
-  // After on-chain confirmation, mirror the state change to the off-chain DB
   useEffect(() => {
     if (!isConfirmed || !pendingAction.current || !address) return;
     const action = pendingAction.current;
     pendingAction.current = null;
 
-    syncMilestoneAction(
-      escrowAddress,
-      Number(milestone.id),
-      address,
-      action
-    ).catch((err) =>
-      console.warn("[MilestoneCard] backend sync failed:", err)
-    );
+    if (action === "dispute") {
+      syncDisputeRaised(escrowAddress, Number(milestone.id), address).catch((err) =>
+        console.warn("[MilestoneCard] dispute sync failed:", err)
+      );
+    } else {
+      syncMilestoneAction(escrowAddress, Number(milestone.id), address, action).catch(
+        (err) => console.warn("[MilestoneCard] milestone sync failed:", err)
+      );
+    }
   }, [isConfirmed, escrowAddress, milestone.id, address]);
 
   const handleMarkDelivered = () => {
@@ -83,6 +83,11 @@ export function MilestoneCard({
   const handleApprove = () => {
     pendingAction.current = "approve";
     approveMilestone(milestone.id);
+  };
+
+  const handleRaiseDispute = () => {
+    pendingAction.current = "dispute";
+    raiseDispute(milestone.id);
   };
 
   return (
@@ -106,10 +111,10 @@ export function MilestoneCard({
         </p>
       )}
 
-      {/* Action buttons — shown only to the relevant party in the right state */}
       <div className="flex flex-wrap gap-2 pt-1">
         {isFreelancer && milestone.state === 0 /* LOCKED */ && (
           <button
+            type="button"
             onClick={handleMarkDelivered}
             disabled={isBusy}
             className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
@@ -120,6 +125,7 @@ export function MilestoneCard({
 
         {isClient && milestone.state === 1 /* DELIVERED */ && (
           <button
+            type="button"
             onClick={handleApprove}
             disabled={isBusy}
             className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
@@ -131,7 +137,8 @@ export function MilestoneCard({
         {(isClient || isFreelancer) &&
           (milestone.state === 0 || milestone.state === 1) && (
             <button
-              onClick={() => raiseDispute(milestone.id)}
+              type="button"
+              onClick={handleRaiseDispute}
               disabled={isBusy}
               className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
             >

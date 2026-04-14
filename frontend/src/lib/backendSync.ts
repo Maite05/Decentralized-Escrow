@@ -19,6 +19,37 @@ export async function registerProject(
 }
 
 /**
+ * Register a new milestone in the off-chain DB after it's added on-chain.
+ */
+export async function registerMilestone(
+  escrowAddress: string,
+  milestoneIndex: number,
+  description: string,
+  amount: string
+): Promise<void> {
+  await post(`/escrow/projects/${escrowAddress}/milestones`, {
+    milestoneIndex,
+    description,
+    amount,
+  });
+}
+
+/**
+ * Notify the backend that a dispute was raised on-chain.
+ */
+export async function syncDisputeRaised(
+  escrowAddress: string,
+  milestoneIndex: number,
+  raisedBy: string
+): Promise<void> {
+  await post("/escrow/disputes", {
+    escrowAddress,
+    milestoneIndex,
+    raisedBy,
+  });
+}
+
+/**
  * Sync a milestone state change to the off-chain DB.
  * Call this after markDelivered or approveMilestone is confirmed on-chain.
  *

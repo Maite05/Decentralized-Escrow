@@ -3,10 +3,12 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import { WalletButton } from "../../components/WalletButton";
 import { MilestoneCard, type MilestoneData } from "../../components/MilestoneCard";
+import { AddMilestoneForm } from "../../components/AddMilestoneForm";
 import { TxLog } from "../../components/TxLog";
 import { AIInsightPanel } from "../../components/AIInsightPanel";
 import { useProject, useMilestone, useMilestoneCount } from "../../hooks/useEscrow";
 import { useSocket } from "../../hooks/useSocket";
+import { useAccount } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
@@ -51,6 +53,8 @@ const EscrowDetail: NextPage = () => {
   const router = useRouter();
   const escrowAddress = (router.query.id as `0x${string}`) ?? ZERO_ADDR;
   const queryClient = useQueryClient();
+
+  const { address: connectedWallet } = useAccount();
 
   const { data: projectData, isLoading: projectLoading } =
     useProject(escrowAddress);
@@ -147,6 +151,13 @@ const EscrowDetail: NextPage = () => {
               freelancerAddress={freelancer}
             />
           ))
+        )}
+        {/* Only the client can add new milestones */}
+        {connectedWallet?.toLowerCase() === client.toLowerCase() && client !== ZERO_ADDR && (
+          <AddMilestoneForm
+            escrowAddress={escrowAddress}
+            nextIndex={milestoneCount}
+          />
         )}
       </section>
 
