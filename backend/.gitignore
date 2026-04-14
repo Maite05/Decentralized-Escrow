@@ -1,0 +1,14 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Environment variables (CRITICAL SECURITY)
+.env
+.env.local
+.env.development.local
+
+
+# Onchain OS specific (Agent state and cached identities)
+.agent_state/
+.tee_cache/
+agent_identity.json
