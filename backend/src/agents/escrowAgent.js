@@ -1,4 +1,4 @@
-import { OnchainOS, TradeSkill, WalletSkill } from '@okx/onchainos-sdk';
+import { OnchainOS, TradeSkill, WalletSkill } from '@okx/onchainos-skill';
 
 
 export const escrowAgent = new OnchainOS({

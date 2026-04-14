@@ -38,7 +38,7 @@ const startServer = async () => {
     try {
         console.log("--- Initializing X Layer Escrow Backend ---");
         
-        console.log("[Agent] Identity: ${process.env.AGENT_WALLET_ADDRESS || "Pending..."}");
+        console.log(`[Agent] Identity: ${process.env.AGENT_WALLET_ADDRESS || 'Pending...'}`);
         
         app.listen(PORT, () => {
             console.log("Server running on http://localhost:${PORT}");

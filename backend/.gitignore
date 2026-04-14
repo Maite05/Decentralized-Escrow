@@ -7,6 +7,13 @@ jspm_packages/
 .env.local
 .env.development.local
 
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
 
 # Onchain OS specific (Agent state and cached identities)
 .agent_state/
