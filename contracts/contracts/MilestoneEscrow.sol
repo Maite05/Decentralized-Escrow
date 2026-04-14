@@ -12,8 +12,11 @@ interface IMediatorRegistry {
 /// @title MilestoneEscrow
 /// @notice Holds ERC-20 funds in a milestone-based escrow between a client and freelancer.
 ///         Disputes are resolved by an approved mediator from MediatorRegistry.
+///         A 5% protocol fee is deducted from each milestone payment on release.
 contract MilestoneEscrow is ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    uint256 public constant FEE_PERCENT = 5;
 
     enum State {
         LOCKED,
@@ -43,6 +46,7 @@ contract MilestoneEscrow is ReentrancyGuard {
     Project public project;
     Milestone[] private _milestones;
     IMediatorRegistry public immutable registry;
+    address public immutable feeRecipient;
 
     event ProjectCreated(
         uint256 indexed projectId,
@@ -58,6 +62,12 @@ contract MilestoneEscrow is ReentrancyGuard {
         uint256 indexed milestoneId,
         address indexed freelancer,
         uint256 amount
+    );
+    event FeeCollected(
+        uint256 indexed projectId,
+        uint256 indexed milestoneId,
+        address indexed feeRecipient,
+        uint256 fee
     );
     event DisputeRaised(
         uint256 indexed projectId,
@@ -113,13 +123,15 @@ contract MilestoneEscrow is ReentrancyGuard {
         address _freelancer,
         address _token,
         uint256 _totalAmount,
-        address _registry
+        address _registry,
+        address _feeRecipient
     ) {
         require(_client != address(0), "MilestoneEscrow: zero client");
         require(_freelancer != address(0), "MilestoneEscrow: zero freelancer");
         require(_client != _freelancer, "MilestoneEscrow: client == freelancer");
         require(_token != address(0), "MilestoneEscrow: zero token");
         require(_registry != address(0), "MilestoneEscrow: zero registry");
+        require(_feeRecipient != address(0), "MilestoneEscrow: zero feeRecipient");
 
         project = Project({
             id: _projectId,
@@ -130,6 +142,7 @@ contract MilestoneEscrow is ReentrancyGuard {
             createdAt: block.timestamp
         });
         registry = IMediatorRegistry(_registry);
+        feeRecipient = _feeRecipient;
 
         emit ProjectCreated(
             _projectId,
@@ -184,6 +197,7 @@ contract MilestoneEscrow is ReentrancyGuard {
     }
 
     /// @notice Client approves delivered work and releases the milestone payment.
+    ///         A 5% protocol fee is deducted and sent to feeRecipient; the rest goes to the freelancer.
     /// @param milestoneId Index of the milestone.
     function approveMilestone(
         uint256 milestoneId
@@ -192,8 +206,12 @@ contract MilestoneEscrow is ReentrancyGuard {
         require(m.state == State.DELIVERED, "MilestoneEscrow: not delivered");
         m.state = State.RELEASED;
         uint256 amount = m.amount;
-        IERC20(project.token).safeTransfer(project.freelancer, amount);
-        emit Released(project.id, milestoneId, project.freelancer, amount);
+        uint256 fee = (amount * FEE_PERCENT) / 100;
+        uint256 payout = amount - fee;
+        IERC20(project.token).safeTransfer(feeRecipient, fee);
+        IERC20(project.token).safeTransfer(project.freelancer, payout);
+        emit FeeCollected(project.id, milestoneId, feeRecipient, fee);
+        emit Released(project.id, milestoneId, project.freelancer, payout);
     }
 
     /// @notice Either party opens a dispute on a LOCKED or DELIVERED milestone.
@@ -208,28 +226,42 @@ contract MilestoneEscrow is ReentrancyGuard {
         emit DisputeRaised(project.id, milestoneId, msg.sender);
     }
 
-    /// @notice An approved mediator resolves an open dispute.
-    /// @param milestoneId  Index of the disputed milestone.
-    /// @param freelancerWon True → release to freelancer; false → refund client.
+    /// @notice An approved mediator resolves an open dispute with a proportional split.
+    /// @param milestoneId     Index of the disputed milestone.
+    /// @param freelancerShare Amount (in token units) awarded to the freelancer (fee deducted from this).
+    /// @param clientShare     Amount (in token units) refunded to the client.
+    ///                        freelancerShare + clientShare must equal the milestone amount.
     function resolveDispute(
         uint256 milestoneId,
-        bool freelancerWon
+        uint256 freelancerShare,
+        uint256 clientShare
     ) external onlyApprovedMediator nonReentrant {
         Milestone storage m = _getMilestone(milestoneId);
         require(m.state == State.DISPUTED, "MilestoneEscrow: not disputed");
-        uint256 amount = m.amount;
-        if (freelancerWon) {
-            m.state = State.RELEASED;
-            IERC20(project.token).safeTransfer(project.freelancer, amount);
-        } else {
-            m.state = State.REFUNDED;
-            IERC20(project.token).safeTransfer(project.client, amount);
+        require(
+            freelancerShare + clientShare == m.amount,
+            "MilestoneEscrow: shares must equal milestone amount"
+        );
+
+        m.state = freelancerShare > 0 ? State.RELEASED : State.REFUNDED;
+
+        if (clientShare > 0) {
+            IERC20(project.token).safeTransfer(project.client, clientShare);
         }
+
+        if (freelancerShare > 0) {
+            uint256 fee = (freelancerShare * FEE_PERCENT) / 100;
+            uint256 payout = freelancerShare - fee;
+            IERC20(project.token).safeTransfer(feeRecipient, fee);
+            IERC20(project.token).safeTransfer(project.freelancer, payout);
+            emit FeeCollected(project.id, milestoneId, feeRecipient, fee);
+        }
+
         emit DisputeResolved(
             project.id,
             milestoneId,
             msg.sender,
-            freelancerWon
+            freelancerShare > 0
         );
     }
 

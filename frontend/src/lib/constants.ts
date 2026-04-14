@@ -10,6 +10,6 @@ export const FACTORY_ABI = EscrowFactoryABI as readonly object[];
 export const ESCROW_ABI = MilestoneEscrowABI as readonly object[];
 export const ERC20_ABI = ERC20ABI as readonly object[];
 
-// TODO: set NEXT_PUBLIC_USDC_ADDRESS in .env — mainnet/testnet USDC contract address
+// Set NEXT_PUBLIC_USDC_ADDRESS in .env to the USDC contract address on your target chain.
 export const USDC_ADDRESS = (process.env.NEXT_PUBLIC_USDC_ADDRESS ??
   "") as `0x${string}`;

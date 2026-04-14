@@ -10,6 +10,7 @@ contract EscrowFactory {
 
     uint256 private _projectCounter;
     address public immutable mediatorRegistry;
+    address public immutable feeRecipient;
 
     /// @notice All escrow addresses ever deployed, in creation order.
     address[] public allProjects;
@@ -29,12 +30,14 @@ contract EscrowFactory {
         uint256 totalAmount
     );
 
-    constructor(address _mediatorRegistry) {
+    constructor(address _mediatorRegistry, address _feeRecipient) {
         require(
             _mediatorRegistry != address(0),
             "EscrowFactory: zero registry"
         );
+        require(_feeRecipient != address(0), "EscrowFactory: zero feeRecipient");
         mediatorRegistry = _mediatorRegistry;
+        feeRecipient = _feeRecipient;
     }
 
     /// @notice Deploys a new MilestoneEscrow and registers it in the indexes.
@@ -59,7 +62,8 @@ contract EscrowFactory {
             freelancer,
             token,
             totalAmount,
-            mediatorRegistry
+            mediatorRegistry,
+            feeRecipient
         );
 
         escrow = address(newEscrow);

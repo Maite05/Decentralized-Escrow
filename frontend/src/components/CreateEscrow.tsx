@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
+import { decodeEventLog } from "viem";
 import { useEscrowWrite } from "../hooks/useEscrowWrite";
-import { USDC_ADDRESS } from "../lib/constants";
+import { USDC_ADDRESS, FACTORY_ABI } from "../lib/constants";
+import { registerProject } from "../lib/backendSync";
 
 type Step = "idle" | "approving" | "deploying" | "done";
 
@@ -9,9 +12,12 @@ export function CreateEscrow() {
   const [freelancer, setFreelancer] = useState("");
   const [amountStr, setAmountStr] = useState("");
 
+  const { address } = useAccount();
+
   const {
     approveUSDC,
     createProject,
+    receipt,
     isPending,
     isConfirming,
     isConfirmed,
@@ -19,17 +25,51 @@ export function CreateEscrow() {
   } = useEscrowWrite();
 
   const isBusy = isPending || isConfirming;
-  const amountWei = BigInt(
-    Math.floor(parseFloat(amountStr || "0") * 1e18)
-  );
+  const amountWei = BigInt(Math.floor(parseFloat(amountStr || "0") * 1e18));
 
-  if (isConfirmed && step === "approving") {
-    setStep("deploying");
-    reset();
-  }
-  if (isConfirmed && step === "deploying") {
+  // USDC approval confirmed → move to deploy step
+  useEffect(() => {
+    if (isConfirmed && step === "approving") {
+      setStep("deploying");
+      reset();
+    }
+  }, [isConfirmed, step, reset]);
+
+  // Deploy confirmed → parse event, sync to backend, mark done
+  useEffect(() => {
+    if (!isConfirmed || step !== "deploying" || !receipt || !address) return;
+
+    let escrowAddress: string | undefined;
+
+    for (const log of receipt.logs) {
+      try {
+        const decoded = decodeEventLog({
+          abi: FACTORY_ABI,
+          data: log.data,
+          topics: log.topics,
+          eventName: "ProjectCreated",
+        });
+        // ProjectCreated(projectId, escrow, client, freelancer, token, totalAmount)
+        escrowAddress = (decoded.args as { escrow: string }).escrow;
+        break;
+      } catch {
+        // log belongs to a different contract/event — skip
+      }
+    }
+
     setStep("done");
-  }
+
+    if (escrowAddress) {
+      registerProject(
+        escrowAddress,
+        address,
+        freelancer,
+        amountWei.toString()
+      ).catch((err) =>
+        console.warn("[CreateEscrow] backend sync failed:", err)
+      );
+    }
+  }, [isConfirmed, step, receipt, address, freelancer, amountWei]);
 
   const handleApprove = () => {
     if (!amountStr || amountWei === 0n) return;
@@ -96,7 +136,7 @@ export function CreateEscrow() {
         type="text"
         placeholder="Freelancer address (0x…)"
         value={freelancer}
-        onChange={e => setFreelancer(e.target.value)}
+        onChange={(e) => setFreelancer(e.target.value)}
         disabled={step !== "idle"}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
       />
@@ -106,7 +146,7 @@ export function CreateEscrow() {
         placeholder="Amount (USDC)"
         min="0"
         value={amountStr}
-        onChange={e => setAmountStr(e.target.value)}
+        onChange={(e) => setAmountStr(e.target.value)}
         disabled={step !== "idle"}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
       />

@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  FREELANCER
+  MEDIATOR
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  DISPUTED
+  CANCELLED
+}
+
+enum MilestoneStatus {
+  LOCKED
+  DELIVERED
+  RELEASED
+  DISPUTED
+  REFUNDED
+}
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED
+  CANCELLED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  walletAddress String   @unique
+  role          Role     @default(CLIENT)
+  email         String?
+  createdAt     DateTime @default(now())
+
+  clientProjects     Project[] @relation("ClientProjects")
+  freelancerProjects Project[] @relation("FreelancerProjects")
+  mediatedDisputes   Dispute[] @relation("MediatorDisputes")
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  escrowAddress String        @unique
+  clientId      String
+  freelancerId  String
+  status        ProjectStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  client     User        @relation("ClientProjects", fields: [clientId], references: [id])
+  freelancer User        @relation("FreelancerProjects", fields: [freelancerId], references: [id])
+  milestones Milestone[]
+  dispute    Dispute?
+}
+
+model Milestone {
+  id               String          @id @default(cuid())
+  projectId        String
+  milestoneIndex   Int
+  description      String
+  amount           String
+  status           MilestoneStatus @default(LOCKED)
+  freelancerDelivered Boolean      @default(false)
+  clientApproved   Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, milestoneIndex])
+}
+
+model Dispute {
+  id             String        @id @default(cuid())
+  projectId      String        @unique
+  milestoneIndex Int
+  raisedBy       String
+  mediatorId     String?
+  status         DisputeStatus @default(OPEN)
+  resolution     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  project  Project @relation(fields: [projectId], references: [id])
+  mediator User?   @relation("MediatorDisputes", fields: [mediatorId], references: [id])
+}

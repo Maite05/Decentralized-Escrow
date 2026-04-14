@@ -23,7 +23,8 @@ describe("EscrowFactory", function () {
 
     const FactoryFactory = await ethers.getContractFactory("EscrowFactory");
     const factory = (await FactoryFactory.deploy(
-      await registry.getAddress()
+      await registry.getAddress(),
+      owner.address  // feeRecipient
     )) as unknown as EscrowFactory;
 
     return { factory, token, registry, owner, client, freelancer, clientB };
@@ -37,11 +38,25 @@ describe("EscrowFactory", function () {
       );
     });
 
+    it("stores feeRecipient address", async function () {
+      const { factory, owner } = await loadFixture(deployFixture);
+      expect(await factory.feeRecipient()).to.equal(owner.address);
+    });
+
     it("reverts with zero registry address", async function () {
+      const [owner] = await ethers.getSigners();
       const FactoryFactory = await ethers.getContractFactory("EscrowFactory");
       await expect(
-        FactoryFactory.deploy(ethers.ZeroAddress)
+        FactoryFactory.deploy(ethers.ZeroAddress, owner.address)
       ).to.be.revertedWith("EscrowFactory: zero registry");
+    });
+
+    it("reverts with zero feeRecipient address", async function () {
+      const { registry } = await loadFixture(deployFixture);
+      const FactoryFactory = await ethers.getContractFactory("EscrowFactory");
+      await expect(
+        FactoryFactory.deploy(await registry.getAddress(), ethers.ZeroAddress)
+      ).to.be.revertedWith("EscrowFactory: zero feeRecipient");
     });
 
     it("starts with zero project count", async function () {

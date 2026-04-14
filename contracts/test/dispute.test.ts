@@ -10,6 +10,8 @@ import type {
 describe("Dispute flow", function () {
   const TOTAL = ethers.parseEther("1000");
   const M_AMOUNT = ethers.parseEther("300");
+  const M_FEE = M_AMOUNT * 5n / 100n;        // 15 ETH
+  const M_PAYOUT = M_AMOUNT - M_FEE;          // 285 ETH
 
   async function deployFixture() {
     const [owner, client, freelancer, mediator, nonMediator] =
@@ -44,7 +46,8 @@ describe("Dispute flow", function () {
       freelancer.address,
       await token.getAddress(),
       TOTAL,
-      await registry.getAddress()
+      await registry.getAddress(),
+      owner.address  // feeRecipient
     )) as unknown as MilestoneEscrow;
 
     await token.mint(client.address, TOTAL);
@@ -78,7 +81,7 @@ describe("Dispute flow", function () {
       const { escrow, client } = await loadFixture(deployFixture);
       await escrow.connect(client).raiseDispute(0n);
       const m = await escrow.getMilestone(0n);
-      expect(m.state).to.equal(3n); 
+      expect(m.state).to.equal(3n);
     });
 
     it("freelancer can raise dispute on a LOCKED milestone", async function () {
@@ -93,7 +96,7 @@ describe("Dispute flow", function () {
       await escrow.connect(freelancer).markDelivered(0n);
       await escrow.connect(client).raiseDispute(0n);
       const m = await escrow.getMilestone(0n);
-      expect(m.state).to.equal(3n); 
+      expect(m.state).to.equal(3n);
     });
 
     it("emits DisputeRaised event", async function () {
@@ -122,18 +125,26 @@ describe("Dispute flow", function () {
     });
   });
 
-  describe("resolveDispute: mediator rules for freelancer", function () {
-    it("transfers milestone amount to freelancer", async function () {
+  describe("resolveDispute: mediator rules for freelancer (full amount)", function () {
+    it("net payout (after 5% fee) goes to freelancer", async function () {
       const { escrow, token, freelancer, mediator } =
         await loadFixture(disputedFixture);
       await expect(
-        escrow.connect(mediator).resolveDispute(0n, true)
-      ).to.changeTokenBalance(token, freelancer, M_AMOUNT);
+        escrow.connect(mediator).resolveDispute(0n, M_AMOUNT, 0n)
+      ).to.changeTokenBalance(token, freelancer, M_PAYOUT);
+    });
+
+    it("5% fee goes to feeRecipient", async function () {
+      const { escrow, token, mediator, owner } =
+        await loadFixture(disputedFixture);
+      await expect(
+        escrow.connect(mediator).resolveDispute(0n, M_AMOUNT, 0n)
+      ).to.changeTokenBalance(token, owner, M_FEE);
     });
 
     it("sets milestone state to RELEASED", async function () {
       const { escrow, mediator } = await loadFixture(disputedFixture);
-      await escrow.connect(mediator).resolveDispute(0n, true);
+      await escrow.connect(mediator).resolveDispute(0n, M_AMOUNT, 0n);
       const m = await escrow.getMilestone(0n);
       expect(m.state).to.equal(2n); // RELEASED
     });
@@ -141,34 +152,60 @@ describe("Dispute flow", function () {
     it("emits DisputeResolved with freelancerWon=true", async function () {
       const { escrow, mediator, freelancer } =
         await loadFixture(disputedFixture);
-      await expect(escrow.connect(mediator).resolveDispute(0n, true))
+      await expect(escrow.connect(mediator).resolveDispute(0n, M_AMOUNT, 0n))
         .to.emit(escrow, "DisputeResolved")
         .withArgs(1n, 0n, mediator.address, true);
     });
   });
 
-  describe("resolveDispute: mediator refunds client", function () {
-    it("transfers milestone amount back to client", async function () {
+  describe("resolveDispute: mediator refunds client (full amount)", function () {
+    it("full amount refunded to client (no fee on refund)", async function () {
       const { escrow, token, client, mediator } =
         await loadFixture(disputedFixture);
       await expect(
-        escrow.connect(mediator).resolveDispute(0n, false)
+        escrow.connect(mediator).resolveDispute(0n, 0n, M_AMOUNT)
       ).to.changeTokenBalance(token, client, M_AMOUNT);
     });
 
     it("sets milestone state to REFUNDED", async function () {
       const { escrow, mediator } = await loadFixture(disputedFixture);
-      await escrow.connect(mediator).resolveDispute(0n, false);
+      await escrow.connect(mediator).resolveDispute(0n, 0n, M_AMOUNT);
       const m = await escrow.getMilestone(0n);
-      expect(m.state).to.equal(4n);
+      expect(m.state).to.equal(4n); // REFUNDED
     });
 
     it("emits DisputeResolved with freelancerWon=false", async function () {
-      const { escrow, mediator, client } =
+      const { escrow, mediator } =
         await loadFixture(disputedFixture);
-      await expect(escrow.connect(mediator).resolveDispute(0n, false))
+      await expect(escrow.connect(mediator).resolveDispute(0n, 0n, M_AMOUNT))
         .to.emit(escrow, "DisputeResolved")
         .withArgs(1n, 0n, mediator.address, false);
+    });
+  });
+
+  describe("resolveDispute: partial split", function () {
+    it("splits proportionally between freelancer and client", async function () {
+      const { escrow, token, client, freelancer, mediator } =
+        await loadFixture(disputedFixture);
+      const freelancerShare = M_AMOUNT / 2n;   // 150 ETH
+      const clientShare = M_AMOUNT - freelancerShare; // 150 ETH
+      const freelancerFee = freelancerShare * 5n / 100n; // 7.5 ETH
+      const freelancerPayout = freelancerShare - freelancerFee; // 142.5 ETH
+
+      await expect(
+        escrow.connect(mediator).resolveDispute(0n, freelancerShare, clientShare)
+      ).to.changeTokenBalances(
+        token,
+        [freelancer, client],
+        [freelancerPayout, clientShare]
+      );
+    });
+
+    it("reverts if shares do not sum to milestone amount", async function () {
+      const { escrow, mediator } = await loadFixture(disputedFixture);
+      await expect(
+        escrow.connect(mediator).resolveDispute(0n, M_AMOUNT / 2n, M_AMOUNT / 2n + 1n)
+      ).to.be.revertedWith("MilestoneEscrow: shares must equal milestone amount");
     });
   });
 
@@ -176,21 +213,21 @@ describe("Dispute flow", function () {
     it("reverts if called by client", async function () {
       const { escrow, client } = await loadFixture(disputedFixture);
       await expect(
-        escrow.connect(client).resolveDispute(0n, true)
+        escrow.connect(client).resolveDispute(0n, M_AMOUNT, 0n)
       ).to.be.revertedWith("MilestoneEscrow: not approved mediator");
     });
 
     it("reverts if called by freelancer", async function () {
       const { escrow, freelancer } = await loadFixture(disputedFixture);
       await expect(
-        escrow.connect(freelancer).resolveDispute(0n, true)
+        escrow.connect(freelancer).resolveDispute(0n, M_AMOUNT, 0n)
       ).to.be.revertedWith("MilestoneEscrow: not approved mediator");
     });
 
     it("reverts if called by random address", async function () {
       const { escrow, nonMediator } = await loadFixture(disputedFixture);
       await expect(
-        escrow.connect(nonMediator).resolveDispute(0n, true)
+        escrow.connect(nonMediator).resolveDispute(0n, M_AMOUNT, 0n)
       ).to.be.revertedWith("MilestoneEscrow: not approved mediator");
     });
 
@@ -199,15 +236,14 @@ describe("Dispute flow", function () {
         await loadFixture(disputedFixture);
       await registry.connect(owner).revoke(mediator.address);
       await expect(
-        escrow.connect(mediator).resolveDispute(0n, true)
+        escrow.connect(mediator).resolveDispute(0n, M_AMOUNT, 0n)
       ).to.be.revertedWith("MilestoneEscrow: not approved mediator");
     });
 
     it("reverts if milestone is not in DISPUTED state", async function () {
       const { escrow, mediator } = await loadFixture(deployFixture);
-      
       await expect(
-        escrow.connect(mediator).resolveDispute(0n, true)
+        escrow.connect(mediator).resolveDispute(0n, M_AMOUNT, 0n)
       ).to.be.revertedWith("MilestoneEscrow: not disputed");
     });
   });

@@ -1,5 +1,7 @@
+import { useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
 import { useEscrowWrite } from "../hooks/useEscrowWrite";
+import { syncMilestoneAction } from "../lib/backendSync";
 
 /** Mirror of the Solidity State enum (0-indexed). */
 const STATE_LABELS = [
@@ -11,11 +13,11 @@ const STATE_LABELS = [
 ] as const;
 
 const STATE_COLOURS: Record<number, string> = {
-  0: "bg-yellow-100 text-yellow-800",   
-  1: "bg-blue-100 text-blue-800",       
-  2: "bg-green-100 text-green-800",     
-  3: "bg-red-100 text-red-800",         
-  4: "bg-gray-100 text-gray-600",       
+  0: "bg-yellow-100 text-yellow-800",
+  1: "bg-blue-100 text-blue-800",
+  2: "bg-green-100 text-green-800",
+  3: "bg-red-100 text-red-800",
+  4: "bg-gray-100 text-gray-600",
 };
 
 export interface MilestoneData {
@@ -40,13 +42,14 @@ export function MilestoneCard({
   freelancerAddress,
 }: Props) {
   const { address } = useAccount();
-  const { markDelivered, approveMilestone, raiseDispute, isPending, isConfirming } =
+  const { markDelivered, approveMilestone, raiseDispute, isPending, isConfirming, isConfirmed } =
     useEscrowWrite(escrowAddress);
 
-  const isClient =
-    address?.toLowerCase() === clientAddress.toLowerCase();
-  const isFreelancer =
-    address?.toLowerCase() === freelancerAddress.toLowerCase();
+  // Track which action was last triggered so we know what to sync on confirmation
+  const pendingAction = useRef<"deliver" | "approve" | null>(null);
+
+  const isClient = address?.toLowerCase() === clientAddress.toLowerCase();
+  const isFreelancer = address?.toLowerCase() === freelancerAddress.toLowerCase();
 
   const isBusy = isPending || isConfirming;
   const stateLabel = STATE_LABELS[milestone.state] ?? "Unknown";
@@ -55,6 +58,32 @@ export function MilestoneCard({
     minimumFractionDigits: 2,
     maximumFractionDigits: 6,
   });
+
+  // After on-chain confirmation, mirror the state change to the off-chain DB
+  useEffect(() => {
+    if (!isConfirmed || !pendingAction.current || !address) return;
+    const action = pendingAction.current;
+    pendingAction.current = null;
+
+    syncMilestoneAction(
+      escrowAddress,
+      Number(milestone.id),
+      address,
+      action
+    ).catch((err) =>
+      console.warn("[MilestoneCard] backend sync failed:", err)
+    );
+  }, [isConfirmed, escrowAddress, milestone.id, address]);
+
+  const handleMarkDelivered = () => {
+    pendingAction.current = "deliver";
+    markDelivered(milestone.id);
+  };
+
+  const handleApprove = () => {
+    pendingAction.current = "approve";
+    approveMilestone(milestone.id);
+  };
 
   return (
     <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-white shadow-sm">
@@ -81,7 +110,7 @@ export function MilestoneCard({
       <div className="flex flex-wrap gap-2 pt-1">
         {isFreelancer && milestone.state === 0 /* LOCKED */ && (
           <button
-            onClick={() => markDelivered(milestone.id)}
+            onClick={handleMarkDelivered}
             disabled={isBusy}
             className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
@@ -91,7 +120,7 @@ export function MilestoneCard({
 
         {isClient && milestone.state === 1 /* DELIVERED */ && (
           <button
-            onClick={() => approveMilestone(milestone.id)}
+            onClick={handleApprove}
             disabled={isBusy}
             className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
           >

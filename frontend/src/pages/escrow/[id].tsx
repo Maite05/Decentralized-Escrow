@@ -6,6 +6,9 @@ import { MilestoneCard, type MilestoneData } from "../../components/MilestoneCar
 import { TxLog } from "../../components/TxLog";
 import { AIInsightPanel } from "../../components/AIInsightPanel";
 import { useProject, useMilestone, useMilestoneCount } from "../../hooks/useEscrow";
+import { useSocket } from "../../hooks/useSocket";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
@@ -47,6 +50,7 @@ function MilestoneRow({
 const EscrowDetail: NextPage = () => {
   const router = useRouter();
   const escrowAddress = (router.query.id as `0x${string}`) ?? ZERO_ADDR;
+  const queryClient = useQueryClient();
 
   const { data: projectData, isLoading: projectLoading } =
     useProject(escrowAddress);
@@ -57,6 +61,18 @@ const EscrowDetail: NextPage = () => {
     | undefined) ?? [0n, ZERO_ADDR, ZERO_ADDR, ZERO_ADDR, 0n, 0n];
 
   const milestoneCount = Number(countData ?? 0n);
+
+  // Real-time updates via Socket.io
+  const { connected, milestoneEvent } = useSocket(
+    router.isReady ? escrowAddress : null
+  );
+
+  // When a milestone update arrives, invalidate the on-chain read cache
+  // so wagmi re-fetches the latest state from the RPC node.
+  useEffect(() => {
+    if (!milestoneEvent) return;
+    queryClient.invalidateQueries({ queryKey: ["readContract"] });
+  }, [milestoneEvent, queryClient]);
 
   if (!router.isReady) return null;
 
@@ -70,7 +86,15 @@ const EscrowDetail: NextPage = () => {
         >
           ← Dashboard
         </Link>
-        <WalletButton />
+        <div className="flex items-center gap-3">
+          {connected && (
+            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+              Live
+            </span>
+          )}
+          <WalletButton />
+        </div>
       </header>
 
       {/* Escrow address + summary */}
@@ -114,7 +138,7 @@ const EscrowDetail: NextPage = () => {
         {milestoneCount === 0 ? (
           <p className="text-sm text-gray-400 italic">No milestones added yet.</p>
         ) : (
-          Array.from({ length: milestoneCount }, (_, i) => BigInt(i)).map(id => (
+          Array.from({ length: milestoneCount }, (_, i) => BigInt(i)).map((id) => (
             <MilestoneRow
               key={id.toString()}
               escrowAddress={escrowAddress}

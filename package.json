@@ -4,7 +4,8 @@
   "private": true,
   "workspaces": [
     "contracts",
-    "frontend"
+    "frontend",
+    "backend"
   ],
   "scripts": {
     "compile": "npm run compile -w contracts",
@@ -13,5 +14,9 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2",
+    "viem": "^2.47.17"
   }
 }

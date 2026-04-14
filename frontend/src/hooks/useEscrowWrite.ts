@@ -26,8 +26,11 @@ export function useEscrowWrite(escrowAddress?: `0x${string}`) {
     reset,
   } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({ hash });
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    data: receipt,
+  } = useWaitForTransactionReceipt({ hash });
 
   /** Step 1 of project creation: approve USDC for the EscrowFactory. */
   function approveUSDC(amount: bigint): void {
@@ -95,6 +98,7 @@ export function useEscrowWrite(escrowAddress?: `0x${string}`) {
     approveMilestone,
     raiseDispute,
     hash,
+    receipt,
     isPending,
     isConfirming,
     isConfirmed,

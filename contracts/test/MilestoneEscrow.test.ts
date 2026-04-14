@@ -11,6 +11,8 @@ import type {
 describe("MilestoneEscrow", function () {
   const TOTAL_AMOUNT = ethers.parseEther("1000");
   const MILESTONE_AMOUNT = ethers.parseEther("200");
+  const MILESTONE_FEE = MILESTONE_AMOUNT * 5n / 100n;        // 10 ETH
+  const MILESTONE_PAYOUT = MILESTONE_AMOUNT - MILESTONE_FEE; // 190 ETH
 
   async function deployFixture() {
     const [owner, client, freelancer, mediator, stranger] =
@@ -45,7 +47,8 @@ describe("MilestoneEscrow", function () {
       freelancer.address,
       await token.getAddress(),
       TOTAL_AMOUNT,
-      await registry.getAddress()
+      await registry.getAddress(),
+      owner.address  // feeRecipient
     )) as unknown as MilestoneEscrow;
 
     await token.mint(client.address, TOTAL_AMOUNT * 2n);
@@ -90,28 +93,17 @@ describe("MilestoneEscrow", function () {
 
       const EscrowFactory =
         await ethers.getContractFactory("MilestoneEscrow");
-      await expect(
-        EscrowFactory.deploy(
-          42n,
-          client2.address,
-          freelancer2.address,
-          await token2.getAddress(),
-          ethers.parseEther("500"),
-          await registry2.getAddress()
-        )
-      ).to.emit(
-        await ethers
-          .getContractFactory("MilestoneEscrow")
-          .then(() => EscrowFactory.deploy(
-            43n,
-            client2.address,
-            freelancer2.address,
-            await token2.getAddress(),
-            ethers.parseEther("500"),
-            await registry2.getAddress()
-          )),
-        "ProjectCreated"
+      const escrow2 = await EscrowFactory.deploy(
+        43n,
+        client2.address,
+        freelancer2.address,
+        await token2.getAddress(),
+        ethers.parseEther("500"),
+        await registry2.getAddress(),
+        owner2.address
       );
+      await expect(escrow2.deploymentTransaction())
+        .to.emit(escrow2, "ProjectCreated");
     });
 
     it("reverts if client == freelancer", async function () {
@@ -133,7 +125,8 @@ describe("MilestoneEscrow", function () {
           same.address,
           await token2.getAddress(),
           ethers.parseEther("100"),
-          await registry2.getAddress()
+          await registry2.getAddress(),
+          owner2.address
         )
       ).to.be.revertedWith("MilestoneEscrow: client == freelancer");
     });
@@ -197,27 +190,38 @@ describe("MilestoneEscrow", function () {
       const { escrow, freelancer } = await loadFixture(fundedFixture);
       await escrow.connect(freelancer).markDelivered(0n);
       const m = await escrow.getMilestone(0n);
-      expect(m.state).to.equal(1n); 
+      expect(m.state).to.equal(1n);
     });
 
-    it("client approves → payment released to freelancer", async function () {
+    it("client approves → net payout (after 5% fee) released to freelancer", async function () {
       const { escrow, token, client, freelancer } =
         await loadFixture(fundedFixture);
       await escrow.connect(freelancer).markDelivered(0n);
       await expect(
         escrow.connect(client).approveMilestone(0n)
-      ).to.changeTokenBalance(token, freelancer, MILESTONE_AMOUNT);
+      ).to.changeTokenBalance(token, freelancer, MILESTONE_PAYOUT);
       const m = await escrow.getMilestone(0n);
       expect(m.state).to.equal(2n);
     });
 
-    it("emits Released event", async function () {
-      const { escrow, client, freelancer } =
+    it("5% fee is sent to feeRecipient on approve", async function () {
+      const { escrow, token, client, freelancer, owner } =
+        await loadFixture(fundedFixture);
+      await escrow.connect(freelancer).markDelivered(0n);
+      await expect(
+        escrow.connect(client).approveMilestone(0n)
+      ).to.changeTokenBalance(token, owner, MILESTONE_FEE);
+    });
+
+    it("emits FeeCollected then Released events", async function () {
+      const { escrow, client, freelancer, owner } =
         await loadFixture(fundedFixture);
       await escrow.connect(freelancer).markDelivered(0n);
       await expect(escrow.connect(client).approveMilestone(0n))
-        .to.emit(escrow, "Released")
-        .withArgs(1n, 0n, freelancer.address, MILESTONE_AMOUNT);
+        .to.emit(escrow, "FeeCollected")
+        .withArgs(1n, 0n, owner.address, MILESTONE_FEE)
+        .and.to.emit(escrow, "Released")
+        .withArgs(1n, 0n, freelancer.address, MILESTONE_PAYOUT);
     });
   });
 
@@ -301,8 +305,12 @@ describe("MilestoneEscrow", function () {
         freelancer2.address,
         await malToken.getAddress(),
         ethers.parseEther("500"),
-        await registry2.getAddress()
+        await registry2.getAddress(),
+        owner2.address  // feeRecipient
       )) as unknown as MilestoneEscrow;
+
+      const M_AMOUNT = ethers.parseEther("200");
+      const M_PAYOUT = M_AMOUNT * 95n / 100n; // 190 ETH after 5% fee
 
       await malToken.mint(client2.address, ethers.parseEther("600"));
       await malToken
@@ -311,18 +319,17 @@ describe("MilestoneEscrow", function () {
       await escrow2.connect(client2).createProject(ethers.parseEther("500"));
       await escrow2
         .connect(client2)
-        .addMilestone(ethers.parseEther("200"), "Re-entry target");
+        .addMilestone(M_AMOUNT, "Re-entry target");
 
       await escrow2.connect(freelancer2).markDelivered(0n);
 
       await malToken.enableAttack(await escrow2.getAddress(), 0);
 
-      // The first call should succeed (reentrancy guard kicks in for the nested call)
-      // The outer call completes; the inner re-entry attempt is silently caught by try/catch
-      // in MaliciousERC20. We verify state is RELEASED exactly once (amount transferred once).
+      // The first call should succeed (reentrancy guard kicks in for the nested call).
+      // Freelancer receives net payout after 5% fee.
       await expect(
         escrow2.connect(client2).approveMilestone(0n)
-      ).to.changeTokenBalance(malToken, freelancer2, ethers.parseEther("200"));
+      ).to.changeTokenBalance(malToken, freelancer2, M_PAYOUT);
 
       const m = await escrow2.getMilestone(0n);
       expect(m.state).to.equal(2n);

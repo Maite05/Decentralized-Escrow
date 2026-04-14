@@ -13,8 +13,7 @@ interface Props {
 export function AIInsightPanel({ projectId }: Props) {
   const { data, isLoading, isError } = useQuery<InsightResponse>({
     queryKey: ["ai-insight", projectId],
-    // TODO: ensure NEXT_PUBLIC_API_URL is set in .env and the backend exposes GET /ai/risk/:id
-    queryFn: () => get<InsightResponse>(`/ai/risk/${projectId}`),
+    queryFn: () => get<InsightResponse>(`/escrow/ai/risk/${projectId}`),
     refetchInterval: 60_000,
     retry: 1,
   });

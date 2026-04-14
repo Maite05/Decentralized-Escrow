@@ -7,11 +7,16 @@ async function main(): Promise<void> {
   console.log(`Deploying from: ${deployer.address}`);
   console.log(`Network: ${network.name}`);
 
-  // TODO: set STAKE_TOKEN_ADDRESS in .env — address of the ERC-20 used for mediator stakes
+  // Set STAKE_TOKEN_ADDRESS in .env — address of the ERC-20 used for mediator stakes.
   const stakeTokenAddress = process.env.STAKE_TOKEN_ADDRESS;
   if (!stakeTokenAddress) {
     throw new Error("STAKE_TOKEN_ADDRESS is not set in .env");
   }
+
+  // FEE_RECIPIENT: wallet that collects the 5% protocol fee on each milestone release.
+  // Defaults to the deployer if not set.
+  const feeRecipient = process.env.FEE_RECIPIENT || deployer.address;
+  console.log(`Fee recipient: ${feeRecipient}`);
 
   console.log("\n[1/2] Deploying MediatorRegistry...");
   const RegistryFactory = await ethers.getContractFactory("MediatorRegistry");
@@ -25,7 +30,7 @@ async function main(): Promise<void> {
 
   console.log("\n[2/2] Deploying EscrowFactory...");
   const FactoryFactory = await ethers.getContractFactory("EscrowFactory");
-  const factory = await FactoryFactory.deploy(registryAddress);
+  const factory = await FactoryFactory.deploy(registryAddress, feeRecipient);
   await factory.waitForDeployment();
   const factoryAddress = await factory.getAddress();
   console.log(`  EscrowFactory deployed at: ${factoryAddress}`);

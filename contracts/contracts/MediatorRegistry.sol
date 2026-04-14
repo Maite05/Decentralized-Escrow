@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 contract MediatorRegistry is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    // TODO: adjust REQUIRED_STAKE to match your token decimals and desired amount
+    // 100 tokens (assumes 18 decimals). Adjust before mainnet deployment.
     uint256 public constant REQUIRED_STAKE = 100 ether;
 
     /// @notice ERC-20 token used for mediator staking.

@@ -1,4 +1,3 @@
-// TODO: set NEXT_PUBLIC_API_URL in .env — base URL of the backend API (e.g. http://localhost:4000)
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 /** Fallback shown in AIInsightPanel when the backend is unreachable. */
