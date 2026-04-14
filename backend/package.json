@@ -1,6 +1,7 @@
 {
   "name": "@decentralized-escrow/backend",
   "version": "1.0.0",
+  "description": "Decentralized milestone escrow backend for X Layer",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,21 +11,25 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy"
   },
+  "keywords": ["web3", "escrow", "x-layer", "agent", "onchain-os"],
+  "license": "ISC",
   "dependencies": {
-    "@okx-dex/okx-dex-sdk": "^1.0.0",
+    "@okx-dex/okx-dex-sdk": "latest",
+    "@okx/onchainos-skills": "latest",
     "@prisma/client": "^5.0.0",
     "bullmq": "^5.73.5",
     "cors": "^2.8.5",
-    "dotenv": "^16.0.0",
-    "ethers": "^6.0.0",
-    "express": "^4.18.0",
-    "helmet": "^7.0.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.11.1",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
     "morgan": "^1.10.0",
     "socket.io": "^4.7.0",
     "viem": "^2.0.0",
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "nodemon": "^3.1.0",
     "prisma": "^5.0.0"
   }
 }
