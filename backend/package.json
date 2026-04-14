@@ -1,0 +1,16 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Decentralized escrow backend",
+  "main": "index.js",
+  "scripts": {},
+  "dependencies": {
+    "@okx-dex/okx-dex-sdk": "^1.0.18",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.16.0",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1"
+  }
+}
