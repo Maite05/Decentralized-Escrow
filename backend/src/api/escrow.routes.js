@@ -3,10 +3,9 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { getIO } from '../index.js';
 import { enqueueNotification } from '../jobs/notificationQueue.js';
+import { x402 } from '../lib/x402.js';
 
 const router = Router();
-
-// ── Schemas ───────────────────────────────────────────────────────────────────
 
 const registerProjectSchema = z.object({
   escrowAddress: z.string().min(1),
@@ -39,9 +38,6 @@ const resolveDisputeSchema = z.object({
   mediatorWallet: z.string().min(1),
 });
 
-// ── Projects ──────────────────────────────────────────────────────────────────
-
-// POST /escrow/projects — register a newly deployed escrow
 router.post('/projects', async (req, res, next) => {
   try {
     const body = registerProjectSchema.parse(req.body);
@@ -86,7 +82,6 @@ router.post('/projects', async (req, res, next) => {
   }
 });
 
-// POST /escrow/projects/:escrowAddress/milestones — register on-chain milestone
 router.post('/projects/:escrowAddress/milestones', async (req, res, next) => {
   try {
     const body = addMilestoneSchema.parse(req.body);
@@ -123,7 +118,6 @@ router.post('/projects/:escrowAddress/milestones', async (req, res, next) => {
   }
 });
 
-// GET /escrow/projects/:wallet — list projects for a wallet
 router.get('/projects/:wallet', async (req, res, next) => {
   try {
     const wallet = req.params.wallet.toLowerCase();
@@ -148,9 +142,6 @@ router.get('/projects/:wallet', async (req, res, next) => {
   }
 });
 
-// ── Milestones ────────────────────────────────────────────────────────────────
-
-// POST /escrow/milestones/approve — deliver or approve a milestone
 router.post('/milestones/approve', async (req, res, next) => {
   try {
     const body = milestoneActionSchema.parse(req.body);
@@ -215,7 +206,6 @@ router.post('/milestones/approve', async (req, res, next) => {
       data: updateData,
     });
 
-    // Auto-complete project when all milestones are released
     if (updateData.status === 'RELEASED') {
       const remaining = await prisma.milestone.count({
         where: { projectId: project.id, status: { not: 'RELEASED' } },
@@ -255,9 +245,7 @@ router.post('/milestones/approve', async (req, res, next) => {
   }
 });
 
-// ── Disputes ──────────────────────────────────────────────────────────────────
 
-// POST /escrow/disputes — raise a dispute
 router.post('/disputes', async (req, res, next) => {
   try {
     const body = raiseDisputeSchema.parse(req.body);
@@ -300,7 +288,6 @@ router.post('/disputes', async (req, res, next) => {
   }
 });
 
-// GET /escrow/disputes/:escrowAddress
 router.get('/disputes/:escrowAddress', async (req, res, next) => {
   try {
     const escrowAddress = req.params.escrowAddress.toLowerCase();
@@ -318,7 +305,6 @@ router.get('/disputes/:escrowAddress', async (req, res, next) => {
   }
 });
 
-// POST /escrow/disputes/:id/resolve
 router.post('/disputes/:id/resolve', async (req, res, next) => {
   try {
     const body = resolveDisputeSchema.parse(req.body);
@@ -358,10 +344,8 @@ router.post('/disputes/:id/resolve', async (req, res, next) => {
   }
 });
 
-// ── AI Risk ───────────────────────────────────────────────────────────────────
 
-// GET /escrow/ai/risk/:projectId
-router.get('/ai/risk/:projectId', async (req, res, next) => {
+router.get('/ai/risk/:projectId', x402, async (req, res, next) => {
   try {
     const project = await prisma.project.findFirst({
       where: {
