@@ -18,8 +18,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@okx-dex/okx-dex-sdk": "latest",
-    "@okx/onchainos-skills": "latest",
+    "@okx-dex/okx-dex-sdk": "^latest",
+    "@okx/onchainos-skills": "^atest",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "ethers": "^6.11.1",
