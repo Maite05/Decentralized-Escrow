@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, post, patch, del } from "../lib/api";
 import type { DashboardSummary, EscrowProject, AiRiskResponse } from "../lib/api";
+import { MOCK_JOBS, MOCK_PROFILES } from "../lib/mockData";
 
 export type ApplicationStatus = "PENDING" | "SHORTLISTED" | "INTERVIEWING" | "REJECTED" | "HIRED";
 
@@ -71,7 +72,20 @@ export interface FreelancerProfile {
 export function useJobs(search?: string) {
   return useQuery<{ jobs: Job[]; total: number }>({
     queryKey: ["jobs", search],
-    queryFn: () => get(`/jobs${search ? `?search=${encodeURIComponent(search)}` : ""}`),
+    queryFn: async () => {
+      try {
+        return await get(`/jobs${search ? `?search=${encodeURIComponent(search)}` : ""}`);
+      } catch {
+        // Fall back to mock data when backend is unreachable
+        const jobs = search
+          ? MOCK_JOBS.filter((j) =>
+              j.title.toLowerCase().includes(search.toLowerCase()) ||
+              j.description.toLowerCase().includes(search.toLowerCase())
+            )
+          : MOCK_JOBS;
+        return { jobs: jobs as Job[], total: jobs.length };
+      }
+    },
     staleTime: 30_000,
   });
 }
@@ -101,7 +115,26 @@ export function useTalentProfiles(params?: { skill?: string; availability?: stri
   const query = qs.toString() ? `?${qs.toString()}` : "";
   return useQuery<{ profiles: FreelancerProfile[]; total: number }>({
     queryKey: ["talent-profiles", params],
-    queryFn: () => get(`/auth/profiles${query}`),
+    queryFn: async () => {
+      try {
+        return await get(`/auth/profiles${query}`);
+      } catch {
+        // Fall back to mock data when backend is unreachable
+        let profiles = MOCK_PROFILES as unknown as FreelancerProfile[];
+        if (params?.skill) profiles = profiles.filter((p) => p.skills.includes(params.skill!));
+        if (params?.availability) profiles = profiles.filter((p) => p.availability === params.availability);
+        if (params?.search) {
+          const s = params.search.toLowerCase();
+          profiles = profiles.filter(
+            (p) =>
+              p.displayName?.toLowerCase().includes(s) ||
+              p.bio?.toLowerCase().includes(s) ||
+              p.tagline?.toLowerCase().includes(s)
+          );
+        }
+        return { profiles, total: profiles.length };
+      }
+    },
     staleTime: 30_000,
   });
 }
