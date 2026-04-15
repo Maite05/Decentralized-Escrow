@@ -1,24 +1,25 @@
 import type { NextPage } from "next";
 import { useRouter } from "next/router";
-import Link from "next/link";
-import { WalletButton } from "../../components/WalletButton";
+import { useAccount } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { Navbar } from "../../components/Navbar";
 import { MilestoneCard, type MilestoneData } from "../../components/MilestoneCard";
 import { AddMilestoneForm } from "../../components/AddMilestoneForm";
 import { TxLog } from "../../components/TxLog";
 import { AIInsightPanel } from "../../components/AIInsightPanel";
 import { useProject, useMilestone, useMilestoneCount } from "../../hooks/useEscrow";
 import { useSocket } from "../../hooks/useSocket";
-import { useAccount } from "wagmi";
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
+function shorten(addr: string) {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+// ── Milestone row (reads its own on-chain data) ───────────────────────────────
 function MilestoneRow({
-  escrowAddress,
-  milestoneId,
-  clientAddress,
-  freelancerAddress,
+  escrowAddress, milestoneId, clientAddress, freelancerAddress,
 }: {
   escrowAddress: `0x${string}`;
   milestoneId: bigint;
@@ -27,17 +28,9 @@ function MilestoneRow({
 }) {
   const { data, isLoading } = useMilestone(escrowAddress, milestoneId);
   if (isLoading || !data) {
-    return (
-      <div className="border border-gray-100 rounded-xl p-4 animate-pulse bg-gray-50 h-20" />
-    );
+    return <div className="card p-5 animate-pulse h-24 bg-slate-50" />;
   }
-  const [id, amount, state, deliveredAt, description] = data as [
-    bigint,
-    bigint,
-    number,
-    bigint,
-    string,
-  ];
+  const [id, amount, state, deliveredAt, description] = data as [bigint, bigint, number, bigint, string];
   const milestone: MilestoneData = { id, amount, state, deliveredAt, description };
   return (
     <MilestoneCard
@@ -49,15 +42,14 @@ function MilestoneRow({
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 const EscrowDetail: NextPage = () => {
   const router = useRouter();
   const escrowAddress = (router.query.id as `0x${string}`) ?? ZERO_ADDR;
+  const { address: connectedWallet } = useAccount();
   const queryClient = useQueryClient();
 
-  const { address: connectedWallet } = useAccount();
-
-  const { data: projectData, isLoading: projectLoading } =
-    useProject(escrowAddress);
+  const { data: projectData, isLoading: projectLoading } = useProject(escrowAddress);
   const { data: countData } = useMilestoneCount(escrowAddress);
 
   const [, client, freelancer, , totalAmount] = (projectData as
@@ -65,14 +57,10 @@ const EscrowDetail: NextPage = () => {
     | undefined) ?? [0n, ZERO_ADDR, ZERO_ADDR, ZERO_ADDR, 0n, 0n];
 
   const milestoneCount = Number(countData ?? 0n);
+  const isClient = connectedWallet?.toLowerCase() === client.toLowerCase() && client !== ZERO_ADDR;
 
-  // Real-time updates via Socket.io
-  const { connected, milestoneEvent } = useSocket(
-    router.isReady ? escrowAddress : null
-  );
-
-  // When a milestone update arrives, invalidate the on-chain read cache
-  // so wagmi re-fetches the latest state from the RPC node.
+  // Real-time updates
+  const { connected, milestoneEvent } = useSocket(router.isReady ? escrowAddress : null);
   useEffect(() => {
     if (!milestoneEvent) return;
     queryClient.invalidateQueries({ queryKey: ["readContract"] });
@@ -81,93 +69,100 @@ const EscrowDetail: NextPage = () => {
   if (!router.isReady) return null;
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-10 space-y-8">
-      {/* Header */}
-      <header className="flex items-center justify-between">
-        <Link
-          href="/"
-          className="text-blue-600 hover:underline text-sm font-medium"
-        >
-          ← Dashboard
-        </Link>
-        <div className="flex items-center gap-3">
-          {connected && (
-            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-              Live
-            </span>
-          )}
-          <WalletButton />
+    <>
+      <Navbar backHref="/" backLabel="Dashboard" />
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+
+        {/* Address + live badge */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-mono text-base font-semibold text-slate-800 break-all">
+                {escrowAddress}
+              </h1>
+              {connected && (
+                <span className="flex items-center gap-1 badge badge-green">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                  Live
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(escrowAddress)}
+            className="btn-outline text-xs shrink-0"
+          >
+            Copy
+          </button>
         </div>
-      </header>
 
-      {/* Escrow address + summary */}
-      <section>
-        <h1 className="text-lg font-bold font-mono text-gray-800 break-all">
-          {escrowAddress}
-        </h1>
-        {projectLoading ? (
-          <div className="h-4 w-64 bg-gray-100 animate-pulse rounded mt-2" />
-        ) : (
-          <p className="text-sm text-gray-500 mt-1 space-x-3">
-            <span>
-              Client:{" "}
-              <span className="font-mono">{client.slice(0, 6)}…{client.slice(-4)}</span>
-            </span>
-            <span>
-              Freelancer:{" "}
-              <span className="font-mono">{freelancer.slice(0, 6)}…{freelancer.slice(-4)}</span>
-            </span>
-            <span>
-              Budget:{" "}
-              <span className="font-semibold">
-                {(Number(totalAmount) / 1e18).toLocaleString()} tokens
-              </span>
-            </span>
-          </p>
-        )}
-      </section>
-
-      {/* AI Insight */}
-      <AIInsightPanel projectId={escrowAddress} />
-
-      {/* Milestones */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-gray-800">
-          Milestones{" "}
-          <span className="text-sm text-gray-400 font-normal">
-            ({milestoneCount})
-          </span>
-        </h2>
-        {milestoneCount === 0 ? (
-          <p className="text-sm text-gray-400 italic">No milestones added yet.</p>
-        ) : (
-          Array.from({ length: milestoneCount }, (_, i) => BigInt(i)).map((id) => (
-            <MilestoneRow
-              key={id.toString()}
-              escrowAddress={escrowAddress}
-              milestoneId={id}
-              clientAddress={client}
-              freelancerAddress={freelancer}
-            />
-          ))
-        )}
-        {/* Only the client can add new milestones */}
-        {connectedWallet?.toLowerCase() === client.toLowerCase() && client !== ZERO_ADDR && (
-          <AddMilestoneForm
-            escrowAddress={escrowAddress}
-            nextIndex={milestoneCount}
+        {/* Stats bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard
+            label="Budget"
+            value={projectLoading ? "…" : `${(Number(totalAmount) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 4 })} tokens`}
           />
-        )}
-      </section>
+          <StatCard label="Milestones" value={projectLoading ? "…" : milestoneCount.toString()} />
+          <StatCard label="Client" value={client === ZERO_ADDR ? "…" : shorten(client)} mono />
+          <StatCard label="Freelancer" value={freelancer === ZERO_ADDR ? "…" : shorten(freelancer)} mono />
+        </div>
 
-      {/* Transaction log */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold text-gray-800">Transaction Log</h2>
-        <TxLog escrowAddress={escrowAddress} />
-      </section>
-    </main>
+        {/* AI Insight */}
+        <AIInsightPanel projectId={escrowAddress} />
+
+        {/* Milestones */}
+        <section>
+          <h2 className="text-base font-semibold text-slate-900 mb-3">
+            Milestones
+            {milestoneCount > 0 && (
+              <span className="ml-2 text-xs font-normal text-slate-400">
+                ({milestoneCount})
+              </span>
+            )}
+          </h2>
+          <div className="space-y-3">
+            {milestoneCount === 0 && !isClient ? (
+              <p className="text-sm text-slate-400 italic">No milestones added yet.</p>
+            ) : (
+              Array.from({ length: milestoneCount }, (_, i) => BigInt(i)).map((id) => (
+                <MilestoneRow
+                  key={id.toString()}
+                  escrowAddress={escrowAddress}
+                  milestoneId={id}
+                  clientAddress={client}
+                  freelancerAddress={freelancer}
+                />
+              ))
+            )}
+            {isClient && (
+              <AddMilestoneForm escrowAddress={escrowAddress} nextIndex={milestoneCount} />
+            )}
+          </div>
+        </section>
+
+        {/* Transaction log */}
+        <section>
+          <h2 className="text-base font-semibold text-slate-900 mb-3">Transaction Log</h2>
+          <div className="card p-4">
+            <TxLog escrowAddress={escrowAddress} />
+          </div>
+        </section>
+
+      </main>
+    </>
   );
 };
+
+function StatCard({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="card p-3.5 space-y-1">
+      <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">{label}</p>
+      <p className={`text-sm font-semibold text-slate-900 truncate ${mono ? "font-mono" : ""}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
 
 export default EscrowDetail;

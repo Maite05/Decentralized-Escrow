@@ -22,15 +22,18 @@ app.use(express.json());
 const [
   { default: escrowRouter },
   { default: authRouter },
+  { default: jobsRouter },
   { closeNotificationQueue },
 ] = await Promise.all([
   import('./api/escrow.routes.js'),
   import('./api/auth.routes.js'),
+  import('./api/jobs.routes.js'),
   import('./jobs/notificationQueue.js'),
 ]);
 
 app.use('/escrow', escrowRouter);
 app.use('/auth', authRouter);
+app.use('/jobs', jobsRouter);
 
 io.on('connection', (socket) => {
   socket.on('join:project', (projectId) => socket.join(`project:${projectId}`));

@@ -3,21 +3,14 @@ import { useAccount } from "wagmi";
 import { useEscrowWrite } from "../hooks/useEscrowWrite";
 import { syncMilestoneAction, syncDisputeRaised } from "../lib/backendSync";
 
-/** Mirror of the Solidity State enum (0-indexed). */
-const STATE_LABELS = [
-  "Locked",
-  "Delivered",
-  "Released",
-  "Disputed",
-  "Refunded",
-] as const;
+const STATE_LABELS = ["Locked", "Delivered", "Released", "Disputed", "Refunded"] as const;
 
-const STATE_COLOURS: Record<number, string> = {
-  0: "bg-yellow-100 text-yellow-800",
-  1: "bg-blue-100 text-blue-800",
-  2: "bg-green-100 text-green-800",
-  3: "bg-red-100 text-red-800",
-  4: "bg-gray-100 text-gray-600",
+const STATE_STYLE: Record<number, string> = {
+  0: "badge-yellow",
+  1: "badge-blue",
+  2: "badge-green",
+  3: "badge-red",
+  4: "badge-gray",
 };
 
 export interface MilestoneData {
@@ -35,25 +28,17 @@ interface Props {
   freelancerAddress: `0x${string}`;
 }
 
-export function MilestoneCard({
-  escrowAddress,
-  milestone,
-  clientAddress,
-  freelancerAddress,
-}: Props) {
+export function MilestoneCard({ escrowAddress, milestone, clientAddress, freelancerAddress }: Props) {
   const { address } = useAccount();
   const { markDelivered, approveMilestone, raiseDispute, isPending, isConfirming, isConfirmed } =
     useEscrowWrite(escrowAddress);
 
-  // Track the last triggered action so the confirmation handler knows what to sync
   const pendingAction = useRef<"deliver" | "approve" | "dispute" | null>(null);
-
   const isClient = address?.toLowerCase() === clientAddress.toLowerCase();
   const isFreelancer = address?.toLowerCase() === freelancerAddress.toLowerCase();
-
   const isBusy = isPending || isConfirming;
   const stateLabel = STATE_LABELS[milestone.state] ?? "Unknown";
-  const stateColour = STATE_COLOURS[milestone.state] ?? "bg-gray-100 text-gray-600";
+  const badgeClass = STATE_STYLE[milestone.state] ?? "badge-gray";
   const amountFormatted = (Number(milestone.amount) / 1e18).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 6,
@@ -63,89 +48,87 @@ export function MilestoneCard({
     if (!isConfirmed || !pendingAction.current || !address) return;
     const action = pendingAction.current;
     pendingAction.current = null;
-
     if (action === "dispute") {
-      syncDisputeRaised(escrowAddress, Number(milestone.id), address).catch((err) =>
-        console.warn("[MilestoneCard] dispute sync failed:", err)
-      );
+      syncDisputeRaised(escrowAddress, Number(milestone.id), address)
+        .catch((err) => console.warn("[MilestoneCard] dispute sync failed:", err));
     } else {
-      syncMilestoneAction(escrowAddress, Number(milestone.id), address, action).catch(
-        (err) => console.warn("[MilestoneCard] milestone sync failed:", err)
-      );
+      syncMilestoneAction(escrowAddress, Number(milestone.id), address, action)
+        .catch((err) => console.warn("[MilestoneCard] milestone sync failed:", err));
     }
   }, [isConfirmed, escrowAddress, milestone.id, address]);
 
-  const handleMarkDelivered = () => {
-    pendingAction.current = "deliver";
-    markDelivered(milestone.id);
-  };
-
-  const handleApprove = () => {
-    pendingAction.current = "approve";
-    approveMilestone(milestone.id);
-  };
-
-  const handleRaiseDispute = () => {
-    pendingAction.current = "dispute";
-    raiseDispute(milestone.id);
-  };
-
   return (
-    <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-white shadow-sm">
-      <div className="flex justify-between items-start gap-2">
-        <p className="font-medium text-gray-900 flex-1">{milestone.description}</p>
-        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${stateColour}`}>
-          {stateLabel}
-        </span>
+    <div className="card p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-slate-400">
+              #{Number(milestone.id) + 1}
+            </span>
+            <p className="font-medium text-slate-900">{milestone.description}</p>
+          </div>
+          <p className="text-sm text-slate-500 mt-0.5">
+            <span className="font-semibold text-slate-800">{amountFormatted}</span> tokens
+            {milestone.state === 2 && milestone.deliveredAt > 0n && (
+              <span className="ml-2 text-slate-400">
+                · released {new Date(Number(milestone.deliveredAt) * 1000).toLocaleDateString()}
+              </span>
+            )}
+          </p>
+        </div>
+        <span className={`badge ${badgeClass} shrink-0`}>{stateLabel}</span>
       </div>
 
-      <p className="text-sm text-gray-500">
-        Amount:{" "}
-        <span className="font-semibold text-gray-800">{amountFormatted} tokens</span>
-      </p>
+      {/* Progress track */}
+      <div className="flex gap-1">
+        {[0, 1, 2].map((stage) => (
+          <div key={stage} className={`h-1 flex-1 rounded-full transition-colors
+            ${milestone.state >= stage + 1 ? "bg-emerald-400" : "bg-slate-100"}`}
+          />
+        ))}
+      </div>
 
-      {milestone.state === 2 /* RELEASED */ && milestone.deliveredAt > 0n && (
-        <p className="text-xs text-gray-400">
-          Released on{" "}
-          {new Date(Number(milestone.deliveredAt) * 1000).toLocaleDateString()}
-        </p>
-      )}
-
-      <div className="flex flex-wrap gap-2 pt-1">
-        {isFreelancer && milestone.state === 0 /* LOCKED */ && (
-          <button
-            type="button"
-            onClick={handleMarkDelivered}
-            disabled={isBusy}
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isBusy ? "Waiting…" : "Mark Delivered"}
-          </button>
-        )}
-
-        {isClient && milestone.state === 1 /* DELIVERED */ && (
-          <button
-            type="button"
-            onClick={handleApprove}
-            disabled={isBusy}
-            className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-          >
-            {isBusy ? "Waiting…" : "Approve & Release"}
-          </button>
-        )}
-
-        {(isClient || isFreelancer) &&
-          (milestone.state === 0 || milestone.state === 1) && (
-            <button
-              type="button"
-              onClick={handleRaiseDispute}
+      {/* Action buttons */}
+      {(isClient || isFreelancer) && (
+        <div className="flex flex-wrap gap-2 pt-0.5">
+          {isFreelancer && milestone.state === 0 && (
+            <button type="button"
+              onClick={() => { pendingAction.current = "deliver"; markDelivered(milestone.id); }}
               disabled={isBusy}
-              className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
+              className="btn-primary text-xs py-1.5 px-3"
             >
-              {isBusy ? "Waiting…" : "Raise Dispute"}
+              {isBusy ? <><Spinner /> Waiting…</> : "Mark Delivered"}
             </button>
           )}
-      </div>
+          {isClient && milestone.state === 1 && (
+            <button type="button"
+              onClick={() => { pendingAction.current = "approve"; approveMilestone(milestone.id); }}
+              disabled={isBusy}
+              className="btn-success text-xs py-1.5 px-3"
+            >
+              {isBusy ? <><Spinner /> Waiting…</> : "Approve & Release"}
+            </button>
+          )}
+          {(milestone.state === 0 || milestone.state === 1) && (
+            <button type="button"
+              onClick={() => { pendingAction.current = "dispute"; raiseDispute(milestone.id); }}
+              disabled={isBusy}
+              className="btn-danger text-xs py-1.5 px-3"
+            >
+              {isBusy ? <><Spinner /> Waiting…</> : "Raise Dispute"}
+            </button>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
   );
 }
