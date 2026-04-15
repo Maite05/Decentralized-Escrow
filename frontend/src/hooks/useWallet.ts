@@ -1,57 +1,23 @@
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { polygon, polygonMumbai } from "wagmi/chains";
 import type { Chain } from "wagmi/chains";
-
-// X Layer mainnet (196) / testnet (1952) — keep in sync with wagmi.config.ts.
-const xlayer: Chain = {
-  id: 196,
-  name: "X Layer",
-  nativeCurrency: { name: "OKB", symbol: "OKB", decimals: 18 },
-  rpcUrls: {
-    default: {
-      http: [
-        process.env.NEXT_PUBLIC_XLAYER_RPC_URL ?? "https://rpc.xlayer.tech",
-      ],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: "OKX Explorer",
-      url: "https://www.okx.com/explorer/xlayer",
-    },
-  },
-};
-
-const xlayerTestnet: Chain = {
-  id: 1952,
-  name: "X Layer Testnet",
-  nativeCurrency: { name: "OKB", symbol: "OKB", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://testrpc.xlayer.tech"] },
-  },
-  blockExplorers: {
-    default: {
-      name: "OKX Testnet Explorer",
-      url: "https://www.okx.com/explorer/xlayer-test",
-    },
-  },
-  testnet: true,
-};
+// Import chain definitions from the single source of truth.
+import { xlayer, xlayerTestnet } from "../../wagmi.config";
 
 // NEXT_PUBLIC_TARGET_CHAIN_ID controls which chain the app targets.
+//   1952   → X Layer testnet  (default — used for the hackathon demo)
 //   196    → X Layer mainnet
-//   1952   → X Layer testnet
 //   137    → Polygon mainnet
-//   80001  → Polygon Mumbai (default)
+//   80001  → Polygon Mumbai
 const TARGET_CHAIN_ID = parseInt(
   process.env.NEXT_PUBLIC_TARGET_CHAIN_ID ?? "1952",
   10
 );
 
 const CHAIN_MAP: Record<number, Chain> = {
-  196: xlayer,
-  1952: xlayerTestnet,
-  137: polygon,
+  196:   xlayer,
+  1952:  xlayerTestnet,
+  137:   polygon,
   80001: polygonMumbai,
 };
 

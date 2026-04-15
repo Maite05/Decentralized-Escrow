@@ -47,4 +47,69 @@ router.post('/verify', async (req, res, next) => {
   }
 });
 
+const profileSchema = z.object({
+  bio: z.string().max(500).optional(),
+  skills: z.array(z.string().max(40)).max(20).optional(),
+  portfolioUrl: z.string().url().max(300).optional().or(z.literal('')),
+  email: z.string().email().max(200).optional().or(z.literal('')),
+});
+
+/**
+ * GET /auth/profile/:address
+ * Returns public profile data for any wallet address.
+ */
+router.get('/profile/:address', async (req, res, next) => {
+  try {
+    const address = req.params.address.toLowerCase();
+    const user = await prisma.user.findUnique({
+      where: { walletAddress: address },
+      select: {
+        id: true,
+        walletAddress: true,
+        role: true,
+        bio: true,
+        skills: true,
+        portfolioUrl: true,
+        createdAt: true,
+        _count: { select: { freelancerProjects: true, applications: true } },
+      },
+    });
+    if (!user) return res.status(404).json({ error: 'Profile not found' });
+    res.json({ user });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /auth/profile/:address
+ * Updates the freelancer profile for the given wallet.
+ * No auth guard for the hackathon — production should verify a signature.
+ */
+router.patch('/profile/:address', async (req, res, next) => {
+  try {
+    const address = req.params.address.toLowerCase();
+    const body = profileSchema.parse(req.body);
+
+    const updateData = {};
+    if (body.bio !== undefined) updateData.bio = body.bio;
+    if (body.skills !== undefined) updateData.skills = body.skills;
+    if (body.portfolioUrl !== undefined) updateData.portfolioUrl = body.portfolioUrl || null;
+    if (body.email !== undefined) updateData.email = body.email || null;
+
+    const user = await prisma.user.upsert({
+      where: { walletAddress: address },
+      create: { walletAddress: address, role: 'FREELANCER', ...updateData },
+      update: updateData,
+    });
+
+    res.json({ user });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    next(err);
+  }
+});
+
 export default router;

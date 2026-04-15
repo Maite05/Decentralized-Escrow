@@ -101,6 +101,16 @@ export function useEscrowWrite(escrowAddress?: `0x${string}`) {
     });
   }
 
+  /** Mediator resolves a disputed milestone. releaseToFreelancer=true pays freelancer, false refunds client. */
+  function resolveDispute(milestoneId: bigint, releaseToFreelancer: boolean): void {
+    writeContract({
+      address: requireEscrow(),
+      abi: ESCROW_ABI,
+      functionName: "resolveDispute",
+      args: [milestoneId, releaseToFreelancer],
+    });
+  }
+
   return {
     approveUSDC,
     createProject,
@@ -108,6 +118,7 @@ export function useEscrowWrite(escrowAddress?: `0x${string}`) {
     markDelivered,
     approveMilestone,
     raiseDispute,
+    resolveDispute,
     hash,
     receipt,
     isPending,

@@ -11,6 +11,7 @@ const createJobSchema = z.object({
   description: z.string().min(10),
   budget: z.string().min(1),
   skills: z.array(z.string()).default([]),
+  deadline: z.string().datetime().optional(),
 });
 
 const applySchema = z.object({
@@ -61,7 +62,9 @@ router.get('/:id', async (req, res, next) => {
       include: {
         client: { select: { walletAddress: true } },
         applications: {
-          include: { freelancer: { select: { walletAddress: true } } },
+          include: {
+            freelancer: { select: { walletAddress: true, bio: true, skills: true, portfolioUrl: true } },
+          },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -91,6 +94,7 @@ router.post('/', async (req, res, next) => {
         description: body.description,
         budget: body.budget,
         skills: body.skills,
+        deadline: body.deadline ? new Date(body.deadline) : null,
       },
       include: {
         client: { select: { walletAddress: true } },
@@ -142,20 +146,107 @@ router.post('/:id/apply', async (req, res, next) => {
 
 router.post('/:id/hire', async (req, res, next) => {
   try {
-    const { freelancerWallet, escrowAddress } = z.object({
+    const { freelancerWallet, escrowAddress, deadline } = z.object({
       freelancerWallet: z.string().min(1),
       escrowAddress: z.string().min(1),
+      deadline: z.string().datetime().optional(),
     }).parse(req.body);
 
-    const job = await prisma.job.update({
+    const wallet = freelancerWallet.toLowerCase();
+
+    // Mark the hired application as HIRED, others as REJECTED.
+    const job = await prisma.job.findUnique({
+      where: { id: req.params.id },
+      include: {
+        applications: { include: { freelancer: true } },
+      },
+    });
+
+    if (job) {
+      const hiredApp = job.applications.find(
+        (a) => a.freelancer.walletAddress === wallet,
+      );
+      if (hiredApp) {
+        await prisma.application.update({
+          where: { id: hiredApp.id },
+          data: { status: 'HIRED' },
+        });
+        // Reject all other open applications.
+        await prisma.application.updateMany({
+          where: {
+            jobId: req.params.id,
+            id: { not: hiredApp.id },
+            status: { in: ['PENDING', 'SHORTLISTED'] },
+          },
+          data: { status: 'REJECTED' },
+        });
+      }
+    }
+
+    const updated = await prisma.job.update({
       where: { id: req.params.id },
       data: {
         status: 'IN_PROGRESS',
         escrowAddress: escrowAddress.toLowerCase(),
+        deadline: deadline ? new Date(deadline) : undefined,
       },
     });
 
-    res.json({ job });
+    res.json({ job: updated });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    next(err);
+  }
+});
+
+/**
+ * PATCH /jobs/:id/applications/:appId
+ * Shortlist or reject a specific application.
+ * Body: { status: 'SHORTLISTED' | 'REJECTED', clientWallet: string }
+ */
+router.patch('/:id/applications/:appId', async (req, res, next) => {
+  try {
+    const { status, clientWallet } = z.object({
+      status: z.enum(['SHORTLISTED', 'REJECTED']),
+      clientWallet: z.string().min(1),
+    }).parse(req.body);
+
+    const wallet = clientWallet.toLowerCase();
+    const job = await prisma.job.findUnique({
+      where: { id: req.params.id },
+      include: { client: true },
+    });
+
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (job.client.walletAddress !== wallet) {
+      return res.status(403).json({ error: 'Only the client can manage applications' });
+    }
+
+    // Limit shortlisted to 3.
+    if (status === 'SHORTLISTED') {
+      const shortlisted = await prisma.application.count({
+        where: { jobId: req.params.id, status: 'SHORTLISTED' },
+      });
+      if (shortlisted >= 3) {
+        return res.status(409).json({ error: 'Maximum 3 candidates can be shortlisted' });
+      }
+    }
+
+    const application = await prisma.application.update({
+      where: { id: req.params.appId },
+      data: { status },
+      include: { freelancer: { select: { walletAddress: true } } },
+    });
+
+    getIO().to(`job:${req.params.id}`).emit('application:updated', {
+      applicationId: application.id,
+      status: application.status,
+      freelancerWallet: application.freelancer.walletAddress,
+    });
+
+    res.json({ application });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: err.errors });

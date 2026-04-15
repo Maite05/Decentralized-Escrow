@@ -17,13 +17,16 @@
   .card {
     @apply bg-white rounded-2xl border border-slate-200 shadow-sm;
   }
+  .card-highlight {
+    @apply bg-white rounded-2xl border border-indigo-200 shadow-sm;
+  }
 
   /* ── Buttons ────────────────────────────────────────────────────────────── */
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-blue-600 text-white hover:bg-blue-700 active:scale-95;
+    @apply btn bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95;
   }
   .btn-secondary {
     @apply btn bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95;
@@ -37,12 +40,15 @@
   .btn-outline {
     @apply btn border border-slate-300 text-slate-700 hover:bg-slate-50 active:scale-95;
   }
+  .btn-ghost {
+    @apply btn text-slate-500 hover:text-slate-800 hover:bg-slate-100 active:scale-95;
+  }
 
   /* ── Inputs ─────────────────────────────────────────────────────────────── */
   .input {
     @apply w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm
-           placeholder-slate-400 bg-white
-           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+           placeholder-slate-400 bg-white text-slate-900
+           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
            disabled:bg-slate-50 disabled:text-slate-400
            transition-colors;
   }
@@ -54,9 +60,25 @@
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
-  .badge-blue   { @apply badge bg-blue-100 text-blue-700; }
+  .badge-blue   { @apply badge bg-indigo-100 text-indigo-700; }
   .badge-green  { @apply badge bg-emerald-100 text-emerald-700; }
   .badge-yellow { @apply badge bg-amber-100 text-amber-700; }
   .badge-red    { @apply badge bg-red-100 text-red-700; }
   .badge-gray   { @apply badge bg-slate-100 text-slate-600; }
+  .badge-purple { @apply badge bg-purple-100 text-purple-700; }
+
+  /* ── Stat tile ──────────────────────────────────────────────────────────── */
+  .stat-tile {
+    @apply card p-4 space-y-1;
+  }
+
+  /* ── Section header ─────────────────────────────────────────────────────── */
+  .section-header {
+    @apply text-xs font-bold text-slate-400 uppercase tracking-widest mb-3;
+  }
+
+  /* ── Divider ────────────────────────────────────────────────────────────── */
+  .divider {
+    @apply border-t border-slate-100;
+  }
 }

@@ -1,5 +1,73 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+// ─── Dashboard / Escrow project types ──────────────────────────────────────
+
+export interface ActivityItem {
+  type: string;
+  projectId: string;
+  escrowAddress: string;
+  description: string;
+  timestamp: string;
+  txHash: string | null;
+}
+
+export interface EscrowMilestone {
+  id: string;
+  milestoneIndex: number;
+  description: string;
+  amount: string;
+  status: "LOCKED" | "DELIVERED" | "RELEASED" | "DISPUTED" | "REFUNDED";
+  clientApproved: boolean;
+  freelancerDelivered: boolean;
+  deadline?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface EscrowProject {
+  id: string;
+  escrowAddress: string;
+  status: "ACTIVE" | "COMPLETED" | "DISPUTED";
+  totalAmount?: string;
+  title?: string;
+  description?: string;
+  mediatorAddress?: string;
+  client: { id: string; walletAddress: string };
+  freelancer: { id: string; walletAddress: string };
+  milestones: EscrowMilestone[];
+  dispute?: { id: string; status: string; reason?: string } | null;
+  _count?: { milestones: number };
+  createdAt: string;
+}
+
+export interface DashboardSummary {
+  totalLockedUSDC: string;
+  activeCount: number;
+  completedCount: number;
+  disputedCount: number;
+  asClientTotal: number;
+  asFreelancerTotal: number;
+  recentActivity: ActivityItem[];
+  projects: EscrowProject[];
+}
+
+// ─── AI Risk types ──────────────────────────────────────────────────────────
+
+export interface RiskSignal {
+  type: string;
+  confidence: number;
+  description: string;
+}
+
+export interface AiRiskResponse {
+  score: number;
+  signals: RiskSignal[];
+  suggestion: string;
+  projectId?: string;
+  escrowAddress?: string;
+  assessedAt?: string;
+}
+
 /** Fallback shown in AIInsightPanel when the backend is unreachable. */
 export const MOCK_INSIGHT = {
   risk: "Unknown",
@@ -75,6 +143,21 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
   });
   if (!res.ok) {
     throw new Error(`POST ${path} returned ${res.status}: ${res.statusText}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+/**
+ * Performs a PATCH request to the backend API.
+ */
+export async function patch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`PATCH ${path} returned ${res.status}: ${res.statusText}`);
   }
   return res.json() as Promise<T>;
 }

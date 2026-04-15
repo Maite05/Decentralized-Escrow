@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { useAccount } from "wagmi";
 import { Navbar } from "../../components/Navbar";
-import { useJob, useApplyToJob, type Application } from "../../hooks/useJobs";
+import {
+  useJob,
+  useApplyToJob,
+  useUpdateApplicationStatus,
+  type Application,
+} from "../../hooks/useJobs";
 
 const JobDetail: NextPage = () => {
   const router = useRouter();
@@ -83,6 +88,8 @@ const JobDetail: NextPage = () => {
             applications={job.applications ?? []}
             jobStatus={job.status}
             budget={job.budget}
+            isClient={isClient}
+            clientWallet={address ?? ""}
           />
         )}
 
@@ -184,12 +191,19 @@ function ApplicationsSection({
   applications,
   jobStatus,
   budget,
+  isClient,
+  clientWallet,
 }: {
   jobId: string;
   applications: Application[];
   jobStatus: string;
   budget: string;
+  isClient: boolean;
+  clientWallet: string;
 }) {
+  const shortlisted = applications.filter((a) => a.status === "SHORTLISTED");
+  const others = applications.filter((a) => a.status !== "SHORTLISTED");
+
   if (applications.length === 0) {
     return (
       <div className="card p-8 text-center space-y-2">
@@ -199,52 +213,116 @@ function ApplicationsSection({
     );
   }
 
+  const cardProps = { jobId, jobStatus, budget, isClient, clientWallet };
+
   return (
-    <div className="space-y-3">
-      <h2 className="font-semibold text-slate-900">
-        {applications.length} Application{applications.length !== 1 ? "s" : ""}
-      </h2>
-      {applications.map((app) => (
-        <ApplicationCard
-          key={app.id}
-          application={app}
-          jobStatus={jobStatus}
-          budget={budget}
-        />
-      ))}
+    <div className="space-y-4">
+      {shortlisted.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+            Shortlisted
+            <span className="badge badge-green">{shortlisted.length}/3</span>
+          </h2>
+          {shortlisted.map((app) => (
+            <ApplicationCard key={app.id} application={app} {...cardProps} />
+          ))}
+        </div>
+      )}
+      <div className="space-y-2">
+        <h2 className="font-semibold text-slate-900">
+          {shortlisted.length > 0 ? "All Applications" : `${applications.length} Application${applications.length !== 1 ? "s" : ""}`}
+        </h2>
+        {others.map((app) => (
+          <ApplicationCard key={app.id} application={app} {...cardProps} />
+        ))}
+      </div>
     </div>
   );
 }
 
+const STATUS_STYLES: Record<string, string> = {
+  PENDING: "badge-gray",
+  SHORTLISTED: "badge-green",
+  REJECTED: "badge-red",
+  HIRED: "badge-blue",
+};
+
 function ApplicationCard({
   application,
+  jobId,
   jobStatus,
   budget,
+  isClient,
+  clientWallet,
 }: {
   application: Application;
+  jobId: string;
   jobStatus: string;
   budget: string;
+  isClient: boolean;
+  clientWallet: string;
 }) {
   const wallet = application.freelancer.walletAddress;
-  const hireHref = `/create?freelancer=${wallet}&budget=${encodeURIComponent(budget)}`;
+  const hireHref = `/create?freelancer=${wallet}&budget=${encodeURIComponent(budget)}&jobId=${jobId}`;
+  const { mutate: updateStatus, isPending } = useUpdateApplicationStatus();
 
   return (
     <div className="card p-5 space-y-3">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <p className="font-medium text-slate-800 text-sm font-mono">
+          <Link
+            href={`/profile/${wallet}`}
+            className="font-medium text-slate-800 text-sm font-mono hover:text-blue-600 transition-colors"
+          >
             {wallet.slice(0, 6)}…{wallet.slice(-4)}
-          </p>
+          </Link>
           <p className="text-xs text-slate-400 mt-0.5">
             Applied {new Date(application.createdAt).toLocaleDateString()}
           </p>
         </div>
-        {jobStatus === "OPEN" && (
-          <Link href={hireHref} className="btn-success shrink-0 text-sm px-4 py-1.5">
-            Hire
-          </Link>
-        )}
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <span className={`badge ${STATUS_STYLES[application.status] ?? "badge-gray"}`}>
+            {application.status}
+          </span>
+          {isClient && jobStatus === "OPEN" && application.status === "PENDING" && (
+            <>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => updateStatus({ jobId, appId: application.id, status: "SHORTLISTED", clientWallet })}
+                className="btn-success text-xs px-3 py-1"
+              >
+                Shortlist
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => updateStatus({ jobId, appId: application.id, status: "REJECTED", clientWallet })}
+                className="btn-outline text-xs px-3 py-1 text-red-600 border-red-200 hover:bg-red-50"
+              >
+                Reject
+              </button>
+            </>
+          )}
+          {isClient && jobStatus === "OPEN" && application.status === "SHORTLISTED" && (
+            <Link href={hireHref} className="btn-primary text-xs px-3 py-1">
+              Hire
+            </Link>
+          )}
+        </div>
       </div>
+      {(application.freelancer.bio || (application.freelancer.skills ?? []).length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 pb-1">
+          {application.freelancer.bio && (
+            <p className="text-xs text-slate-500 italic line-clamp-1 flex-1 min-w-0">
+              {application.freelancer.bio}
+            </p>
+          )}
+          {(application.freelancer.skills ?? []).slice(0, 4).map((s) => (
+            <span key={s} className="badge badge-gray text-xs">{s}</span>
+          ))}
+        </div>
+      )}
       <p className="text-sm text-slate-600 whitespace-pre-wrap">{application.coverLetter}</p>
     </div>
   );

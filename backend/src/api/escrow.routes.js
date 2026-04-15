@@ -345,6 +345,97 @@ router.post('/disputes/:id/resolve', async (req, res, next) => {
 });
 
 
+router.get('/dashboard/:wallet', async (req, res, next) => {
+  try {
+    const wallet = req.params.wallet.toLowerCase();
+    const user = await prisma.user.findUnique({ where: { walletAddress: wallet } });
+
+    if (!user) {
+      return res.json({
+        totalLockedUSDC: '0.00',
+        activeCount: 0,
+        completedCount: 0,
+        disputedCount: 0,
+        asClientTotal: 0,
+        asFreelancerTotal: 0,
+        recentActivity: [],
+        projects: [],
+      });
+    }
+
+    const projects = await prisma.project.findMany({
+      where: { OR: [{ clientId: user.id }, { freelancerId: user.id }] },
+      include: {
+        client: { select: { id: true, walletAddress: true } },
+        freelancer: { select: { id: true, walletAddress: true } },
+        milestones: { orderBy: { milestoneIndex: 'asc' } },
+        dispute: true,
+        _count: { select: { milestones: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Compute totalAmount from milestones if not stored on the project
+    projects.forEach((p) => {
+      if (!p.totalAmount && p.milestones.length > 0) {
+        p.totalAmount = p.milestones
+          .reduce((s, m) => s + parseFloat(m.amount || '0'), 0)
+          .toFixed(2);
+      }
+    });
+
+    const activeCount = projects.filter((p) => p.status === 'ACTIVE').length;
+    const completedCount = projects.filter((p) => p.status === 'COMPLETED').length;
+    const disputedCount = projects.filter((p) => p.status === 'DISPUTED').length;
+    const asClientTotal = projects.filter((p) => p.clientId === user.id).length;
+    const asFreelancerTotal = projects.filter((p) => p.freelancerId === user.id).length;
+
+    const lockedMilestones = projects.flatMap((p) =>
+      p.milestones.filter((m) => m.status === 'LOCKED' || m.status === 'DELIVERED'),
+    );
+    const totalLockedUSDC = lockedMilestones
+      .reduce((sum, m) => sum + parseFloat(m.amount || '0'), 0)
+      .toFixed(2);
+
+    // Build recent activity from milestone state changes
+    const recentActivity = projects
+      .flatMap((p) =>
+        p.milestones
+          .filter((m) => m.status !== 'LOCKED')
+          .map((m) => ({
+            type:
+              m.status === 'RELEASED'
+                ? 'MILESTONE_RELEASED'
+                : m.status === 'DELIVERED'
+                ? 'MILESTONE_DELIVERED'
+                : m.status === 'DISPUTED'
+                ? 'DISPUTE_RAISED'
+                : 'MILESTONE_DELIVERED',
+            projectId: p.id,
+            escrowAddress: p.escrowAddress,
+            description: `Milestone #${m.milestoneIndex + 1} ${m.status.toLowerCase()} on ${p.escrowAddress.slice(0, 6)}…${p.escrowAddress.slice(-4)}`,
+            timestamp: m.updatedAt || m.createdAt,
+            txHash: null,
+          })),
+      )
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 10);
+
+    res.json({
+      totalLockedUSDC,
+      activeCount,
+      completedCount,
+      disputedCount,
+      asClientTotal,
+      asFreelancerTotal,
+      recentActivity,
+      projects,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/ai/risk/:projectId', x402, async (req, res, next) => {
   try {
     const project = await prisma.project.findFirst({
@@ -375,29 +466,52 @@ router.get('/ai/risk/:projectId', x402, async (req, res, next) => {
 function assessRisk(project) {
   const total = project.milestones.length;
   const released = project.milestones.filter((m) => m.status === 'RELEASED').length;
+  const delivered = project.milestones.filter((m) => m.status === 'DELIVERED').length;
   const disputed = project.milestones.filter((m) => m.status === 'DISPUTED').length;
   const refunded = project.milestones.filter((m) => m.status === 'REFUNDED').length;
 
-  let risk, summary;
+  const signals = [];
+  let score = 20; // baseline low-risk
 
   if (project.dispute?.status === 'OPEN') {
-    risk = 'High';
-    summary = 'An active dispute is open. Funds are locked pending mediator resolution.';
-  } else if (disputed > 0 || refunded > 0) {
-    risk = 'Medium';
-    summary = `${disputed + refunded} milestone(s) were disputed or refunded.`;
-  } else if (total === 0) {
-    risk = 'Medium';
-    summary = 'No milestones defined yet. Project structure is incomplete.';
+    score += 55;
+    signals.push({ type: 'ACTIVE_DISPUTE', confidence: 98, description: 'An active dispute is open — funds locked pending mediator.' });
+  }
+  if (disputed > 0) {
+    score += disputed * 15;
+    signals.push({ type: 'PAST_DISPUTE', confidence: 85, description: `${disputed} milestone(s) previously raised a dispute.` });
+  }
+  if (refunded > 0) {
+    score += refunded * 10;
+    signals.push({ type: 'REFUNDED', confidence: 75, description: `${refunded} milestone(s) were refunded to the client.` });
+  }
+  if (total === 0) {
+    score += 25;
+    signals.push({ type: 'NO_MILESTONES', confidence: 90, description: 'No milestones defined — project structure is incomplete.' });
+  }
+  if (delivered > 0) {
+    signals.push({ type: 'AWAITING_APPROVAL', confidence: 70, description: `${delivered} milestone(s) delivered and awaiting client approval.` });
+  }
+  if (total > 0 && released === total) {
+    score = Math.max(score - 10, 5);
+    signals.push({ type: 'ALL_RELEASED', confidence: 99, description: 'All milestones successfully released — contract fulfilled.' });
+  }
+
+  score = Math.min(score, 100);
+
+  let suggestion;
+  if (score >= 70) {
+    suggestion = 'Immediate mediator intervention recommended. Review dispute evidence before releasing funds.';
+  } else if (score >= 40) {
+    suggestion = 'Monitor closely. Ensure deliverables meet spec before approving the next milestone.';
   } else {
-    const pct = Math.round((released / total) * 100);
-    risk = 'Low';
-    summary = `${released} of ${total} milestones released (${pct}% complete). No disputes detected.`;
+    suggestion = 'Project is progressing normally. Continue milestone reviews on schedule.';
   }
 
   return {
-    risk,
-    summary,
+    score,
+    signals,
+    suggestion,
     projectId: project.id,
     escrowAddress: project.escrowAddress,
     assessedAt: new Date().toISOString(),

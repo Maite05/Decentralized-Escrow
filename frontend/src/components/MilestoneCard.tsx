@@ -3,9 +3,10 @@ import { useAccount } from "wagmi";
 import { useEscrowWrite } from "../hooks/useEscrowWrite";
 import { syncMilestoneAction, syncDisputeRaised } from "../lib/backendSync";
 
+// 0=LOCKED 1=DELIVERED 2=RELEASED 3=DISPUTED 4=REFUNDED
 const STATE_LABELS = ["Locked", "Delivered", "Released", "Disputed", "Refunded"] as const;
 
-const STATE_STYLE: Record<number, string> = {
+const STATE_BADGE: Record<number, string> = {
   0: "badge-yellow",
   1: "badge-blue",
   2: "badge-green",
@@ -13,12 +14,16 @@ const STATE_STYLE: Record<number, string> = {
   4: "badge-gray",
 };
 
+const TIMELINE_STEPS = ["Funded", "In Progress", "Awaiting Approval", "Released"] as const;
+
 export interface MilestoneData {
   id: bigint;
   amount: bigint;
   state: number;
   deliveredAt: bigint;
   description: string;
+  clientApproved?: boolean;
+  freelancerDelivered?: boolean;
 }
 
 interface Props {
@@ -26,23 +31,43 @@ interface Props {
   milestone: MilestoneData;
   clientAddress: `0x${string}`;
   freelancerAddress: `0x${string}`;
+  mediatorAddress?: `0x${string}`;
 }
 
-export function MilestoneCard({ escrowAddress, milestone, clientAddress, freelancerAddress }: Props) {
+function stateToStep(state: number): number {
+  if (state === 0) return 1;
+  if (state === 1 || state === 3) return 2;
+  if (state === 2) return 3;
+  return 1;
+}
+
+export function MilestoneCard({
+  escrowAddress,
+  milestone,
+  clientAddress,
+  freelancerAddress,
+  mediatorAddress,
+}: Props) {
   const { address } = useAccount();
-  const { markDelivered, approveMilestone, raiseDispute, isPending, isConfirming, isConfirmed } =
+  const { markDelivered, approveMilestone, raiseDispute, resolveDispute, isPending, isConfirming, isConfirmed } =
     useEscrowWrite(escrowAddress);
 
-  const pendingAction = useRef<"deliver" | "approve" | "dispute" | null>(null);
-  const isClient = address?.toLowerCase() === clientAddress.toLowerCase();
+  const pendingAction = useRef<"deliver" | "approve" | "dispute" | "resolve_freelancer" | "resolve_client" | null>(null);
+  const isClient     = address?.toLowerCase() === clientAddress.toLowerCase();
   const isFreelancer = address?.toLowerCase() === freelancerAddress.toLowerCase();
-  const isBusy = isPending || isConfirming;
+  const isMediator   = mediatorAddress && address?.toLowerCase() === mediatorAddress.toLowerCase();
+  const isBusy       = isPending || isConfirming;
+
   const stateLabel = STATE_LABELS[milestone.state] ?? "Unknown";
-  const badgeClass = STATE_STYLE[milestone.state] ?? "badge-gray";
-  const amountFormatted = (Number(milestone.amount) / 1e18).toLocaleString(undefined, {
+  const badgeClass = STATE_BADGE[milestone.state] ?? "badge-gray";
+  const amountUSDC = (Number(milestone.amount) / 1e6).toLocaleString(undefined, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
+    maximumFractionDigits: 2,
   });
+
+  const activeStep          = stateToStep(milestone.state);
+  const clientApproved      = milestone.clientApproved      ?? (milestone.state === 2);
+  const freelancerDelivered = milestone.freelancerDelivered ?? (milestone.state >= 1);
 
   useEffect(() => {
     if (!isConfirmed || !pendingAction.current || !address) return;
@@ -51,24 +76,23 @@ export function MilestoneCard({ escrowAddress, milestone, clientAddress, freelan
     if (action === "dispute") {
       syncDisputeRaised(escrowAddress, Number(milestone.id), address)
         .catch((err) => console.warn("[MilestoneCard] dispute sync failed:", err));
-    } else {
+    } else if (action === "deliver" || action === "approve") {
       syncMilestoneAction(escrowAddress, Number(milestone.id), address, action)
         .catch((err) => console.warn("[MilestoneCard] milestone sync failed:", err));
     }
   }, [isConfirmed, escrowAddress, milestone.id, address]);
 
   return (
-    <div className="card p-4 space-y-3">
+    <div className="card p-4 space-y-4">
+      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-slate-400">
-              #{Number(milestone.id) + 1}
-            </span>
-            <p className="font-medium text-slate-900">{milestone.description}</p>
+            <span className="text-xs font-mono text-slate-400">#{Number(milestone.id) + 1}</span>
+            <p className="font-medium text-slate-800 text-sm">{milestone.description}</p>
           </div>
           <p className="text-sm text-slate-500 mt-0.5">
-            <span className="font-semibold text-slate-800">{amountFormatted}</span> tokens
+            <span className="font-semibold text-slate-700">{amountUSDC} USDC</span>
             {milestone.state === 2 && milestone.deliveredAt > 0n && (
               <span className="ml-2 text-slate-400">
                 · released {new Date(Number(milestone.deliveredAt) * 1000).toLocaleDateString()}
@@ -79,47 +103,107 @@ export function MilestoneCard({ escrowAddress, milestone, clientAddress, freelan
         <span className={`badge ${badgeClass} shrink-0`}>{stateLabel}</span>
       </div>
 
-      {/* Progress track */}
-      <div className="flex gap-1">
-        {[0, 1, 2].map((stage) => (
-          <div key={stage} className={`h-1 flex-1 rounded-full transition-colors
-            ${milestone.state >= stage + 1 ? "bg-emerald-400" : "bg-slate-100"}`}
-          />
-        ))}
+      {/* Timeline steps */}
+      <div className="flex items-center gap-0">
+        {TIMELINE_STEPS.map((step, i) => {
+          const done    = i < activeStep;
+          const current = i === activeStep - 1;
+          const isLast  = i === TIMELINE_STEPS.length - 1;
+          return (
+            <div key={step} className="flex items-center flex-1 last:flex-none">
+              <div className="flex flex-col items-center">
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
+                  ${done || current
+                    ? milestone.state === 3
+                      ? "bg-red-500 border-red-500"
+                      : "bg-indigo-600 border-indigo-600"
+                    : "bg-white border-slate-300"}`}
+                >
+                  {done && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className={`text-[10px] mt-1 text-center leading-tight max-w-[56px]
+                  ${done || current ? "text-slate-600" : "text-slate-400"}`}>
+                  {step}
+                </span>
+              </div>
+              {!isLast && (
+                <div className={`h-0.5 flex-1 mx-1 transition-colors
+                  ${done ? "bg-indigo-400" : "bg-slate-200"}`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Dual approval indicators */}
+      <div className="flex items-center gap-4 text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full ${freelancerDelivered ? "bg-emerald-500" : "bg-slate-200"}`} />
+          <span className={freelancerDelivered ? "text-emerald-600" : "text-slate-400"}>
+            Freelancer delivered
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full ${clientApproved ? "bg-indigo-500" : "bg-slate-200"}`} />
+          <span className={clientApproved ? "text-indigo-600" : "text-slate-400"}>
+            Client approved
+          </span>
+        </div>
       </div>
 
       {/* Action buttons */}
-      {(isClient || isFreelancer) && (
-        <div className="flex flex-wrap gap-2 pt-0.5">
-          {isFreelancer && milestone.state === 0 && (
+      <div className="flex flex-wrap gap-2">
+        {isFreelancer && milestone.state === 0 && (
+          <button type="button"
+            onClick={() => { pendingAction.current = "deliver"; markDelivered(milestone.id); }}
+            disabled={isBusy}
+            className="btn-primary text-xs py-1.5 px-3"
+          >
+            {isBusy ? <><Spinner /> Waiting…</> : "Mark as Delivered"}
+          </button>
+        )}
+        {isClient && milestone.state === 1 && (
+          <button type="button"
+            onClick={() => { pendingAction.current = "approve"; approveMilestone(milestone.id); }}
+            disabled={isBusy}
+            className="btn-success text-xs py-1.5 px-3"
+          >
+            {isBusy ? <><Spinner /> Waiting…</> : "Approve & Release USDC"}
+          </button>
+        )}
+        {(isClient || isFreelancer) && (milestone.state === 0 || milestone.state === 1) && (
+          <button type="button"
+            onClick={() => { pendingAction.current = "dispute"; raiseDispute(milestone.id); }}
+            disabled={isBusy}
+            className="btn-danger text-xs py-1.5 px-3"
+          >
+            {isBusy ? <><Spinner /> Waiting…</> : "Raise Dispute"}
+          </button>
+        )}
+        {isMediator && milestone.state === 3 && (
+          <>
             <button type="button"
-              onClick={() => { pendingAction.current = "deliver"; markDelivered(milestone.id); }}
-              disabled={isBusy}
-              className="btn-primary text-xs py-1.5 px-3"
-            >
-              {isBusy ? <><Spinner /> Waiting…</> : "Mark Delivered"}
-            </button>
-          )}
-          {isClient && milestone.state === 1 && (
-            <button type="button"
-              onClick={() => { pendingAction.current = "approve"; approveMilestone(milestone.id); }}
+              onClick={() => { pendingAction.current = "resolve_freelancer"; resolveDispute?.(milestone.id, true); }}
               disabled={isBusy}
               className="btn-success text-xs py-1.5 px-3"
             >
-              {isBusy ? <><Spinner /> Waiting…</> : "Approve & Release"}
+              {isBusy ? <><Spinner /> Waiting…</> : "Release to Freelancer"}
             </button>
-          )}
-          {(milestone.state === 0 || milestone.state === 1) && (
             <button type="button"
-              onClick={() => { pendingAction.current = "dispute"; raiseDispute(milestone.id); }}
+              onClick={() => { pendingAction.current = "resolve_client"; resolveDispute?.(milestone.id, false); }}
               disabled={isBusy}
               className="btn-danger text-xs py-1.5 px-3"
             >
-              {isBusy ? <><Spinner /> Waiting…</> : "Raise Dispute"}
+              {isBusy ? <><Spinner /> Waiting…</> : "Refund Client"}
             </button>
-          )}
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

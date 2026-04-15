@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useWallet } from "../hooks/useWallet";
 
 function ChainBadge({ name }: { name: string }) {
@@ -27,12 +28,9 @@ export function WalletButton() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -46,19 +44,13 @@ export function WalletButton() {
         disabled={isSwitching}
         className="btn-danger text-xs px-3 py-1.5"
       >
-        {isSwitching ? (
-          <>
-            <Spinner /> Switching…
-          </>
-        ) : (
-          <>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            </svg>
-            Switch to {TARGET_CHAIN.name}
-          </>
-        )}
+        {isSwitching ? <><Spinner /> Switching…</> : <>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          Switch to {TARGET_CHAIN.name}
+        </>}
       </button>
     );
   }
@@ -73,19 +65,30 @@ export function WalletButton() {
             onClick={() => setOpen(!open)}
             className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl text-sm font-mono text-slate-700 transition-colors"
           >
-            <span className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex-shrink-0" />
+            <span className="w-4 h-4 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex-shrink-0" />
             {address.slice(0, 6)}…{address.slice(-4)}
-            <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+            <svg className={`w-3 h-3 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
           {open && (
-            <div className="absolute right-0 top-full mt-2 w-48 card shadow-lg py-1 z-20">
+            <div className="absolute right-0 top-full mt-2 w-52 card shadow-lg py-1.5 z-20">
+              <Link
+                href={`/profile/${address}`}
+                onClick={() => setOpen(false)}
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              >
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                My Profile
+              </Link>
               <button
                 type="button"
                 onClick={() => { navigator.clipboard.writeText(address); setOpen(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
               >
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -98,7 +101,7 @@ export function WalletButton() {
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => setOpen(false)}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
               >
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -110,7 +113,7 @@ export function WalletButton() {
               <button
                 type="button"
                 onClick={() => { disconnect(); setOpen(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -125,26 +128,21 @@ export function WalletButton() {
     );
   }
 
-  // Not connected — show connector picker
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
         disabled={isConnecting}
-        className="btn-primary"
+        className="btn-primary text-sm"
       >
-        {isConnecting ? (
-          <><Spinner /> Connecting…</>
-        ) : (
-          <>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Connect Wallet
-          </>
-        )}
+        {isConnecting ? <><Spinner /> Connecting…</> : <>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Connect Wallet
+        </>}
       </button>
       {open && !isConnecting && (
         <div className="absolute right-0 top-full mt-2 w-52 card shadow-lg py-2 z-20">
@@ -172,19 +170,16 @@ function Spinner() {
   return (
     <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
     </svg>
   );
 }
 
 function ConnectorIcon({ name }: { name: string }) {
   const lower = name.toLowerCase();
-  if (lower.includes("metamask")) {
+  if (lower.includes("metamask"))
     return <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center text-xs font-bold">M</span>;
-  }
-  if (lower.includes("coinbase")) {
+  if (lower.includes("coinbase"))
     return <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">C</span>;
-  }
   return <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold">W</span>;
 }

@@ -1,10 +1,10 @@
 import { createConfig, http } from "wagmi";
 import { polygon, polygonMumbai } from "wagmi/chains";
-import { metaMask, walletConnect, coinbaseWallet } from "wagmi/connectors";
+import { walletConnect, coinbaseWallet, injected } from "wagmi/connectors";
 import type { Chain } from "viem";
 
-// X Layer mainnet (Chain ID 196) — OKX's EVM-compatible L2
-const xlayer = {
+// ── X Layer mainnet (Chain ID 196) ────────────────────────────────────────────
+export const xlayer = {
   id: 196,
   name: "X Layer",
   nativeCurrency: { name: "OKB", symbol: "OKB", decimals: 18 },
@@ -23,8 +23,8 @@ const xlayer = {
   },
 } as const satisfies Chain;
 
-// X Layer testnet (Chain ID 1952)
-const xlayerTestnet = {
+// ── X Layer testnet (Chain ID 1952) ───────────────────────────────────────────
+export const xlayerTestnet = {
   id: 1952,
   name: "X Layer Testnet",
   nativeCurrency: { name: "OKB", symbol: "OKB", decimals: 18 },
@@ -40,23 +40,27 @@ const xlayerTestnet = {
   testnet: true,
 } as const satisfies Chain;
 
-// Set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in .env to enable WalletConnect.
+// ── WalletConnect project ID ───────────────────────────────────────────────────
 const walletConnectProjectId =
   process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 
+// ── Wagmi config ──────────────────────────────────────────────────────────────
 export const wagmiConfig = createConfig({
-  chains: [xlayer, xlayerTestnet, polygon, polygonMumbai],
+  // Primary chains: X Layer mainnet + testnet.
+  // Polygon chains are included so wagmi knows their RPC if a user's wallet is
+  // already connected to them; the app will prompt to switch to X Layer.
+  chains: [xlayerTestnet, xlayer, polygon, polygonMumbai],
   connectors: [
-    metaMask(),
+    // injected covers MetaMask, OKX Wallet, Rabby, and any browser extension.
+    injected(),
     walletConnect({ projectId: walletConnectProjectId }),
     coinbaseWallet({ appName: "Decentralized Escrow" }),
   ],
   transports: {
-    // Set NEXT_PUBLIC_XLAYER_RPC_URL in .env to use a private RPC (defaults to public).
-    [xlayer.id]: http(process.env.NEXT_PUBLIC_XLAYER_RPC_URL ?? "https://rpc.xlayer.tech"),
     [xlayerTestnet.id]: http("https://testrpc.xlayer.tech"),
-    // Set NEXT_PUBLIC_POLYGON_RPC_URL / NEXT_PUBLIC_MUMBAI_RPC_URL for private RPCs.
-    [polygon.id]: http(process.env.NEXT_PUBLIC_POLYGON_RPC_URL),
-    [polygonMumbai.id]: http(process.env.NEXT_PUBLIC_MUMBAI_RPC_URL),
+    [xlayer.id]:        http(process.env.NEXT_PUBLIC_XLAYER_RPC_URL ?? "https://rpc.xlayer.tech"),
+    // Fallback public RPCs for Polygon so wagmi never gets undefined transports.
+    [polygon.id]:       http(process.env.NEXT_PUBLIC_POLYGON_RPC_URL      ?? "https://polygon-rpc.com"),
+    [polygonMumbai.id]: http(process.env.NEXT_PUBLIC_MUMBAI_RPC_URL       ?? "https://rpc-mumbai.maticvigil.com"),
   },
 });

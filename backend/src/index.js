@@ -38,6 +38,8 @@ app.use('/jobs', jobsRouter);
 io.on('connection', (socket) => {
   socket.on('join:project', (projectId) => socket.join(`project:${projectId}`));
   socket.on('leave:project', (projectId) => socket.leave(`project:${projectId}`));
+  socket.on('join:job', (jobId) => socket.join(`job:${jobId}`));
+  socket.on('leave:job', (jobId) => socket.leave(`job:${jobId}`));
 });
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

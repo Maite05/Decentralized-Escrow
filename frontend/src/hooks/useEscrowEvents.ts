@@ -1,14 +1,28 @@
 import { useWatchContractEvent } from "wagmi";
 import { useState } from "react";
 import { ESCROW_ABI } from "../lib/constants";
+import type { Log } from "viem";
 
 export type EscrowEventType = "Released" | "DisputeRaised";
 
 export interface EscrowEvent {
-  type: EscrowEventType;
-  args: Record<string, unknown>;
-  blockNumber: bigint;
-  transactionHash: `0x${string}`;
+  type:            EscrowEventType;
+  args:            Record<string, unknown>;
+  blockNumber:     bigint | null;
+  transactionHash: `0x${string}` | null;
+}
+
+// Viem's watched logs include decoded args but the generic Log type doesn't
+// expose them — cast to this shape so we stay type-safe without losing data.
+type DecodedLog = Log & { args?: Record<string, unknown> };
+
+function toEvent(type: EscrowEventType, log: DecodedLog): EscrowEvent {
+  return {
+    type,
+    args:            log.args ?? {},
+    blockNumber:     log.blockNumber,
+    transactionHash: log.transactionHash,
+  };
 }
 
 /**
@@ -19,34 +33,24 @@ export function useEscrowEvents(escrowAddress: `0x${string}`) {
   const [events, setEvents] = useState<EscrowEvent[]>([]);
 
   useWatchContractEvent({
-    address: escrowAddress,
-    abi: ESCROW_ABI,
+    address:   escrowAddress,
+    abi:       ESCROW_ABI,
     eventName: "Released",
     onLogs(logs) {
       setEvents(prev => [
-        ...logs.map(log => ({
-          type: "Released" as const,
-          args: log.args as Record<string, unknown>,
-          blockNumber: log.blockNumber,
-          transactionHash: log.transactionHash,
-        })),
+        ...(logs as DecodedLog[]).map(l => toEvent("Released", l)),
         ...prev,
       ]);
     },
   });
 
   useWatchContractEvent({
-    address: escrowAddress,
-    abi: ESCROW_ABI,
+    address:   escrowAddress,
+    abi:       ESCROW_ABI,
     eventName: "DisputeRaised",
     onLogs(logs) {
       setEvents(prev => [
-        ...logs.map(log => ({
-          type: "DisputeRaised" as const,
-          args: log.args as Record<string, unknown>,
-          blockNumber: log.blockNumber,
-          transactionHash: log.transactionHash,
-        })),
+        ...(logs as DecodedLog[]).map(l => toEvent("DisputeRaised", l)),
         ...prev,
       ]);
     },

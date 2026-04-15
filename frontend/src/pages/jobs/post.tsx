@@ -13,6 +13,7 @@ const PostJob: NextPage = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [budget, setBudget] = useState("");
+  const [deadline, setDeadline] = useState("");
   const [skillInput, setSkillInput] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -45,6 +46,7 @@ const PostJob: NextPage = () => {
         description,
         budget,
         skills,
+        deadline: deadline ? new Date(deadline).toISOString() : undefined,
       });
       router.push(`/jobs/${job.id}`);
     } catch (err: any) {
@@ -122,6 +124,20 @@ const PostJob: NextPage = () => {
                   USDC
                 </span>
               </div>
+            </div>
+
+            {/* Deadline */}
+            <div>
+              <label className="label" htmlFor="deadline">Project Deadline</label>
+              <input
+                id="deadline"
+                type="date"
+                className="input"
+                min={new Date().toISOString().split("T")[0]}
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+              />
+              <p className="text-xs text-slate-400 mt-1">Optional — helps freelancers understand urgency</p>
             </div>
 
             {/* Skills */}

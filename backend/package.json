@@ -9,7 +9,8 @@
     "start": "node src/index.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate deploy"
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "node prisma/seed.js"
   },
   "keywords": ["web3", "escrow", "x-layer", "agent", "onchain-os"],
   "license": "ISC",
