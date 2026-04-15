@@ -210,6 +210,10 @@ The `AIInsightPanel` polls the Onchain OS skill every 60 seconds. If the backend
 |---|---|
 | Sanenelisiwe Zwane | Smart contract + full-stack development |
 
+| Name | Role |
+|---|---|
+| Maite Lemekoana | Smart contract + full-stack development |
+
 ---
 
 ## Running Locally
@@ -229,6 +233,16 @@ npm run sync-abis -w contracts
 
 # 5. Run the frontend
 npm run dev -w frontend
+
+#6. Run the backend 
+ 
+cd backend 
+  #-Database Setup (Prisma)
+  #-Generate Prisma Client
+  npx prisma generate
+  
+  npm run dev
+   
 ```
 
 ## Deploying to X Layer
