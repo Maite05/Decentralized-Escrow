@@ -9,14 +9,25 @@ const httpServer = createServer(app);
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3000';
 
+// Allow any localhost port in development so the frontend works on 3000, 3001, etc.
+const corsOrigin = (origin, callback) => {
+  if (!origin || /^http:\/\/localhost(:\d+)?$/.test(origin)) {
+    callback(null, true);
+  } else if (origin === FRONTEND_URL) {
+    callback(null, true);
+  } else {
+    callback(new Error('Not allowed by CORS'));
+  }
+};
+
 const io = new Server(httpServer, {
-  cors: { origin: FRONTEND_URL, methods: ['GET', 'POST'] },
+  cors: { origin: corsOrigin, methods: ['GET', 'POST'] },
 });
 
 // Make the io instance available to route handlers without circular imports.
 setIO(io);
 
-app.use(cors({ origin: FRONTEND_URL }));
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
 const [

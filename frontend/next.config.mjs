@@ -7,6 +7,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   reactStrictMode: true,
 
+  // wagmi/viem/WalletConnect use eval() internally — allow it in dev and prod.
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data:",
+              "connect-src 'self' http://localhost:4000 ws://localhost:4000 https: wss:",
+              "frame-src 'none'",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
+  },
+
   webpack(config, { isServer }) {
     // ── Module aliases ──────────────────────────────────────────────────────
     config.resolve.alias = {
