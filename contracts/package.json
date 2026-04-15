@@ -12,7 +12,7 @@
     "sync-abis": "hardhat run scripts/sync-abis.ts"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^7.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
     "@openzeppelin/contracts": "^5.0.2",
     "dotenv": "^16.0.0",
     "hardhat": "^2.28.6"
