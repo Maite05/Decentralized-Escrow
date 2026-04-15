@@ -5,12 +5,14 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
-    "deploy": "hardhat run scripts/deploy.ts --network polygonMumbai",
-    "verify": "hardhat run scripts/verify.ts --network polygonMumbai",
+    "deploy": "hardhat run scripts/deploy.ts --network xlayerTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network xlayer",
+    "verify": "hardhat run scripts/verify.ts --network xlayerTestnet",
+    "verify:mainnet": "hardhat run scripts/verify.ts --network xlayer",
     "sync-abis": "hardhat run scripts/sync-abis.ts"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^6.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^7.0.0",
     "@openzeppelin/contracts": "^5.0.2",
     "dotenv": "^16.0.0",
     "hardhat": "^2.28.6"
