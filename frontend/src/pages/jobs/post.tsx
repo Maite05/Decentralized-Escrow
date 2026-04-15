@@ -1,13 +1,14 @@
 import type { NextPage } from "next";
 import { useRouter } from "next/router";
 import { useState, KeyboardEvent } from "react";
-import { useAccount } from "wagmi";
+import { useActiveAddress } from "../../hooks/useActiveAddress";
 import { Navbar } from "../../components/Navbar";
 import { usePostJob } from "../../hooks/useJobs";
+import { FeeBreakdown } from "../../components/FeeBreakdown";
 
 const PostJob: NextPage = () => {
   const router = useRouter();
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useActiveAddress();
   const { mutateAsync: postJob, isPending } = usePostJob();
 
   const [title, setTitle] = useState("");
@@ -125,6 +126,11 @@ const PostJob: NextPage = () => {
                 </span>
               </div>
             </div>
+
+            {/* Live fee preview */}
+            {budget && parseFloat(budget) > 0 && (
+              <FeeBreakdown amount={budget} mode="client" />
+            )}
 
             {/* Deadline */}
             <div>

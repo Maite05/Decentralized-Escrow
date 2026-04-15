@@ -82,6 +82,48 @@ router.post('/projects', async (req, res, next) => {
   }
 });
 
+/**
+ * POST /escrow/projects/:escrowAddress/accept
+ * Freelancer confirms they accept the escrow terms and are ready to start work.
+ */
+router.post('/projects/:escrowAddress/accept', async (req, res, next) => {
+  try {
+    const { freelancerWallet } = z.object({
+      freelancerWallet: z.string().min(1),
+    }).parse(req.body);
+
+    const escrowAddress = req.params.escrowAddress.toLowerCase();
+    const wallet = freelancerWallet.toLowerCase();
+
+    const project = await prisma.project.findUnique({
+      where: { escrowAddress },
+      include: { freelancer: true },
+    });
+
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (project.freelancer.walletAddress !== wallet) {
+      return res.status(403).json({ error: 'Only the assigned freelancer can accept this escrow' });
+    }
+
+    const updated = await prisma.project.update({
+      where: { escrowAddress },
+      data: { freelancerAccepted: true },
+    });
+
+    getIO().to(`escrow:${escrowAddress}`).emit('project:accepted', {
+      escrowAddress,
+      freelancerWallet: wallet,
+    });
+
+    res.json({ project: updated });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    }
+    next(err);
+  }
+});
+
 router.post('/projects/:escrowAddress/milestones', async (req, res, next) => {
   try {
     const body = addMilestoneSchema.parse(req.body);

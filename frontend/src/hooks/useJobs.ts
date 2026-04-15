@@ -1,8 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { get, post, patch } from "../lib/api";
+import { get, post, patch, del } from "../lib/api";
 import type { DashboardSummary, EscrowProject, AiRiskResponse } from "../lib/api";
 
-export type ApplicationStatus = "PENDING" | "SHORTLISTED" | "REJECTED" | "HIRED";
+export type ApplicationStatus = "PENDING" | "SHORTLISTED" | "INTERVIEWING" | "REJECTED" | "HIRED";
+
+export interface ProposedMilestone {
+  description: string;
+  amount: string;
+  dueDate?: string;
+}
 
 export interface Job {
   id: string;
@@ -23,6 +29,8 @@ export interface Application {
   jobId: string;
   coverLetter: string;
   status: ApplicationStatus;
+  interviewNote?: string;
+  proposedMilestones?: ProposedMilestone[];
   createdAt: string;
   freelancer: { walletAddress: string; bio?: string; skills?: string[]; portfolioUrl?: string };
 }
@@ -31,13 +39,31 @@ export interface JobDetail extends Job {
   applications: Application[];
 }
 
+export interface PortfolioItem {
+  id: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  projectUrl?: string;
+  tags: string[];
+  createdAt: string;
+}
+
 export interface FreelancerProfile {
   id: string;
   walletAddress: string;
   role: string;
+  displayName?: string;
+  tagline?: string;
   bio?: string;
   skills: string[];
   portfolioUrl?: string;
+  hourlyRate?: string;
+  availability?: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
+  rating?: number;
+  completedProjects?: number;
+  totalEarned?: string;
+  portfolioItems?: PortfolioItem[];
   createdAt: string;
   _count?: { freelancerProjects: number; applications: number };
 }
@@ -67,6 +93,43 @@ export function useFreelancerProfile(address: string | undefined) {
   });
 }
 
+export function useTalentProfiles(params?: { skill?: string; availability?: string; search?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.skill) qs.set("skill", params.skill);
+  if (params?.availability) qs.set("availability", params.availability);
+  if (params?.search) qs.set("search", params.search);
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return useQuery<{ profiles: FreelancerProfile[]; total: number }>({
+    queryKey: ["talent-profiles", params],
+    queryFn: () => get(`/auth/profiles${query}`),
+    staleTime: 30_000,
+  });
+}
+
+export function useAddPortfolioItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ address, ...body }: {
+      address: string;
+      title: string;
+      description?: string;
+      imageUrl?: string;
+      projectUrl?: string;
+      tags?: string[];
+    }) => post<{ item: PortfolioItem }>(`/auth/profile/${address}/portfolio`, body),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["profile", vars.address] }),
+  });
+}
+
+export function useDeletePortfolioItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ address, itemId }: { address: string; itemId: string }) =>
+      del<{ success: boolean }>(`/auth/profile/${address}/portfolio/${itemId}`),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["profile", vars.address] }),
+  });
+}
+
 export function usePostJob() {
   const qc = useQueryClient();
   return useMutation({
@@ -89,6 +152,7 @@ export function useApplyToJob() {
       jobId: string;
       freelancerWallet: string;
       coverLetter: string;
+      proposedMilestones?: ProposedMilestone[];
     }) => post<{ application: Application }>(`/jobs/${jobId}/apply`, body),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["job", vars.jobId] }),
   });
@@ -97,17 +161,32 @@ export function useApplyToJob() {
 export function useUpdateApplicationStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ jobId, appId, status, clientWallet }: {
+    mutationFn: ({ jobId, appId, status, clientWallet, interviewNote }: {
       jobId: string;
       appId: string;
-      status: "SHORTLISTED" | "REJECTED";
+      status: "SHORTLISTED" | "INTERVIEWING" | "REJECTED";
       clientWallet: string;
+      interviewNote?: string;
     }) =>
       patch<{ application: Application }>(
         `/jobs/${jobId}/applications/${appId}`,
-        { status, clientWallet },
+        { status, clientWallet, interviewNote },
       ),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["job", vars.jobId] }),
+  });
+}
+
+export function useAcceptEscrow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ escrowAddress, freelancerWallet }: {
+      escrowAddress: string;
+      freelancerWallet: string;
+    }) => post<{ project: unknown }>(`/escrow/projects/${escrowAddress}/accept`, { freelancerWallet }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["escrow-projects"] });
+    },
   });
 }
 

@@ -715,6 +715,278 @@ async function main() {
   });
 
   console.log("✓  Alice demo projects (E-Commerce MVP / Brand Identity / Smart Contract Audit) created");
+
+  // ── 7. Demo wallet profiles (wallet simulation mode) ─────────────────────
+  // These addresses match the DEMO_WALLETS list in frontend/src/contexts/DemoWallet.tsx
+  const DEMO = {
+    alice:    "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+    priya:    "0xab5801a7d398351b8be11c439e05c5b3259aec9b",
+    bob:      "0x1234567890123456789012345678901234567890",
+    carol:    "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+    dave:     "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    elena:    "0x5b38da6a701c568545dcfcb03fcb875f56beddc4",
+    mediator: "0x4b20993bc481177ec7e8f571cecae8a9e22c02db",
+  };
+
+  await Promise.all([
+    // Alice — already seeded above, update with richer profile
+    prisma.user.upsert({
+      where:  { walletAddress: DEMO.alice },
+      update: {
+        displayName:       "Alice Chen",
+        tagline:           "DeFi product lead & Web3 builder",
+        availability:      "AVAILABLE",
+        completedProjects: 3,
+        rating:            4.9,
+        totalEarned:       "0",
+      },
+      create: {
+        walletAddress:     DEMO.alice,
+        role:              "CLIENT",
+        email:             "alice@demo.escrow",
+        bio:               "Alice — demo client. I'm a DeFi product lead looking for top Web3 talent to build the future of decentralised finance.",
+        skills:            ["Product Management", "Web3", "DeFi", "Token Design"],
+        displayName:       "Alice Chen",
+        tagline:           "DeFi product lead & Web3 builder",
+        availability:      "AVAILABLE",
+        completedProjects: 3,
+        rating:            4.9,
+        totalEarned:       "0",
+      },
+    }),
+
+    // Priya — second client
+    prisma.user.upsert({
+      where:  { walletAddress: DEMO.priya },
+      update: {
+        displayName:       "Priya Kapoor",
+        tagline:           "NFT marketplace founder & community builder",
+        availability:      "AVAILABLE",
+        completedProjects: 5,
+        rating:            4.8,
+        totalEarned:       "0",
+      },
+      create: {
+        walletAddress:     DEMO.priya,
+        role:              "CLIENT",
+        email:             "priya@demo.escrow",
+        bio:               "Priya — demo client. Founder of an NFT marketplace. I hire designers, frontend developers, and smart contract engineers.",
+        skills:            ["NFT", "Community", "Marketplace", "Solidity"],
+        displayName:       "Priya Kapoor",
+        tagline:           "NFT marketplace founder & community builder",
+        availability:      "AVAILABLE",
+        completedProjects: 5,
+        rating:            4.8,
+        totalEarned:       "0",
+      },
+    }),
+
+    // Bob — senior full-stack freelancer
+    prisma.user.upsert({
+      where:  { walletAddress: DEMO.bob },
+      update: {
+        displayName:       "Bob Martinez",
+        tagline:           "Full-stack Web3 developer · Next.js + Solidity",
+        hourlyRate:        "120",
+        availability:      "AVAILABLE",
+        completedProjects: 12,
+        rating:            4.7,
+        totalEarned:       "45600",
+        portfolioUrl:      "https://github.com/0xBobMartinez",
+      },
+      create: {
+        walletAddress:     DEMO.bob,
+        role:              "FREELANCER",
+        email:             "bob@demo.escrow",
+        bio:               "5 years of full-stack Web3 development. I build end-to-end dApps: React/Next.js frontends, Node.js backends, and Solidity smart contracts. Delivered 12 projects on-time and on-budget.",
+        skills:            ["React", "Next.js", "Solidity", "TypeScript", "Node.js", "Hardhat"],
+        displayName:       "Bob Martinez",
+        tagline:           "Full-stack Web3 developer · Next.js + Solidity",
+        hourlyRate:        "120",
+        availability:      "AVAILABLE",
+        completedProjects: 12,
+        rating:            4.7,
+        totalEarned:       "45600",
+        portfolioUrl:      "https://github.com/0xBobMartinez",
+      },
+    }),
+
+    // Carol — UI/UX designer
+    prisma.user.upsert({
+      where:  { walletAddress: DEMO.carol },
+      update: {
+        displayName:       "Carol Nguyen",
+        tagline:           "UI/UX designer for Web3 — Figma to production",
+        hourlyRate:        "95",
+        availability:      "BUSY",
+        completedProjects: 8,
+        rating:            4.9,
+        totalEarned:       "28000",
+        portfolioUrl:      "https://dribbble.com/0xCarol",
+      },
+      create: {
+        walletAddress:     DEMO.carol,
+        role:              "FREELANCER",
+        email:             "carol@demo.escrow",
+        bio:               "I design beautiful, user-friendly interfaces for Web3 products. From wallet UX flows to DeFi dashboards — I bridge the gap between complex blockchain interactions and delightful user experiences.",
+        skills:            ["UI/UX", "Figma", "React", "Tailwind CSS", "Design Systems", "Web3 UX"],
+        displayName:       "Carol Nguyen",
+        tagline:           "UI/UX designer for Web3 — Figma to production",
+        hourlyRate:        "95",
+        availability:      "BUSY",
+        completedProjects: 8,
+        rating:            4.9,
+        totalEarned:       "28000",
+        portfolioUrl:      "https://dribbble.com/0xCarol",
+      },
+    }),
+
+    // Dave — Solidity / smart contract specialist
+    prisma.user.upsert({
+      where:  { walletAddress: DEMO.dave },
+      update: {
+        displayName:       "Dave Okafor",
+        tagline:           "Solidity engineer & DeFi protocol architect",
+        hourlyRate:        "150",
+        availability:      "AVAILABLE",
+        completedProjects: 20,
+        rating:            5.0,
+        totalEarned:       "112000",
+        portfolioUrl:      "https://github.com/0xDaveOkafor",
+      },
+      create: {
+        walletAddress:     DEMO.dave,
+        role:              "FREELANCER",
+        email:             "dave@demo.escrow",
+        bio:               "Senior Solidity engineer with 7 years of EVM experience. I have audited 40+ contracts and built production DeFi protocols managing $50M+ TVL. Specialities: yield vaults, AMMs, cross-chain bridges, and gas optimisation.",
+        skills:            ["Solidity", "Foundry", "DeFi", "ERC-20", "ERC-4626", "Auditing", "OpenZeppelin", "Hardhat"],
+        displayName:       "Dave Okafor",
+        tagline:           "Solidity engineer & DeFi protocol architect",
+        hourlyRate:        "150",
+        availability:      "AVAILABLE",
+        completedProjects: 20,
+        rating:            5.0,
+        totalEarned:       "112000",
+        portfolioUrl:      "https://github.com/0xDaveOkafor",
+      },
+    }),
+
+    // Elena — Python / data / backend
+    prisma.user.upsert({
+      where:  { walletAddress: DEMO.elena },
+      update: {
+        displayName:       "Elena Vasquez",
+        tagline:           "Python engineer & blockchain data analyst",
+        hourlyRate:        "110",
+        availability:      "AVAILABLE",
+        completedProjects: 9,
+        rating:            4.6,
+        totalEarned:       "38500",
+        portfolioUrl:      "https://github.com/0xElenaV",
+      },
+      create: {
+        walletAddress:     DEMO.elena,
+        role:              "FREELANCER",
+        email:             "elena@demo.escrow",
+        bio:               "I build backend systems and on-chain data pipelines for Web3 companies. Specialities include The Graph subgraphs, event indexing, Python analytics, and REST/GraphQL APIs at scale.",
+        skills:            ["Python", "The Graph", "Node.js", "GraphQL", "PostgreSQL", "Data Engineering", "Web3.py"],
+        displayName:       "Elena Vasquez",
+        tagline:           "Python engineer & blockchain data analyst",
+        hourlyRate:        "110",
+        availability:      "AVAILABLE",
+        completedProjects: 9,
+        rating:            4.6,
+        totalEarned:       "38500",
+        portfolioUrl:      "https://github.com/0xElenaV",
+      },
+    }),
+
+    // Mediator — dispute resolution
+    prisma.user.upsert({
+      where:  { walletAddress: DEMO.mediator },
+      update: {
+        displayName:       "Mediator (Platform)",
+        tagline:           "Certified dispute mediator — neutral & impartial",
+        availability:      "AVAILABLE",
+        completedProjects: 47,
+        rating:            4.95,
+        totalEarned:       "0",
+      },
+      create: {
+        walletAddress:     DEMO.mediator,
+        role:              "MEDIATOR",
+        email:             "mediator@demo.escrow",
+        bio:               "Certified Web3 dispute mediator. I provide neutral, fair resolution for escrow disagreements. Response time under 24 h. 47 disputes resolved with a 94% satisfaction rate.",
+        skills:            ["Dispute Resolution", "Smart Contracts", "Arbitration", "DeFi", "Legal"],
+        displayName:       "Mediator (Platform)",
+        tagline:           "Certified dispute mediator — neutral & impartial",
+        availability:      "AVAILABLE",
+        completedProjects: 47,
+        rating:            4.95,
+        totalEarned:       "0",
+      },
+    }),
+  ]);
+
+  // Portfolio items for Bob
+  const bobUser = await prisma.user.findUnique({ where: { walletAddress: DEMO.bob } });
+  if (bobUser) {
+    const bobPortfolio = [
+      {
+        title:       "DeFi Lending Protocol",
+        description: "Built a full-stack lending protocol with React frontend and Solidity smart contracts. Supports collateralised loans, liquidations, and live APY feeds.",
+        imageUrl:    null,
+        projectUrl:  "https://github.com/0xBobMartinez/defi-lending",
+        tags:        ["Solidity", "React", "DeFi"],
+      },
+      {
+        title:       "NFT Mint Launchpad",
+        description: "Launchpad for ERC-721 collections with allow-list minting, reveal mechanics, and a Merkle-proof whitelist.",
+        imageUrl:    null,
+        projectUrl:  "https://github.com/0xBobMartinez/nft-launchpad",
+        tags:        ["NFT", "Solidity", "Next.js"],
+      },
+    ];
+    for (const item of bobPortfolio) {
+      const exists = await prisma.portfolioItem.findFirst({
+        where: { userId: bobUser.id, title: item.title },
+      });
+      if (!exists) {
+        await prisma.portfolioItem.create({ data: { userId: bobUser.id, ...item } });
+      }
+    }
+  }
+
+  // Portfolio items for Dave
+  const daveUser = await prisma.user.findUnique({ where: { walletAddress: DEMO.dave } });
+  if (daveUser) {
+    const davePortfolio = [
+      {
+        title:       "ERC-4626 Yield Vault",
+        description: "Auto-compounding vault integrating with Aave v3 and Compound. Fully audited with 100% Foundry fuzz test coverage. Manages $8M TVL on mainnet.",
+        imageUrl:    null,
+        projectUrl:  "https://github.com/0xDaveOkafor/yield-vault",
+        tags:        ["Solidity", "DeFi", "Foundry", "ERC-4626"],
+      },
+      {
+        title:       "Cross-chain Bridge",
+        description: "LayerZero-powered bridge enabling USDC transfers between Ethereum, Arbitrum, and Polygon with message verification and replay protection.",
+        imageUrl:    null,
+        projectUrl:  "https://github.com/0xDaveOkafor/xchain-bridge",
+        tags:        ["Solidity", "LayerZero", "Cross-chain"],
+      },
+    ];
+    for (const item of davePortfolio) {
+      const exists = await prisma.portfolioItem.findFirst({
+        where: { userId: daveUser.id, title: item.title },
+      });
+      if (!exists) {
+        await prisma.portfolioItem.create({ data: { userId: daveUser.id, ...item } });
+      }
+    }
+  }
+
+  console.log("✓  Demo wallet profiles (Alice / Priya / Bob / Carol / Dave / Elena / Mediator) seeded");
   console.log("\n🌱  Seed complete.\n");
 }
 

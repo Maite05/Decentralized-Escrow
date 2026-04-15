@@ -17,6 +17,11 @@ const createJobSchema = z.object({
 const applySchema = z.object({
   freelancerWallet: z.string().min(1),
   coverLetter: z.string().min(10),
+  proposedMilestones: z.array(z.object({
+    description: z.string().min(1),
+    amount: z.string().min(1),
+    dueDate: z.string().optional(),
+  })).optional(),
 });
 
 router.get('/', async (req, res, next) => {
@@ -131,8 +136,16 @@ router.post('/:id/apply', async (req, res, next) => {
 
     const application = await prisma.application.upsert({
       where: { jobId_freelancerId: { jobId: job.id, freelancerId: freelancer.id } },
-      create: { jobId: job.id, freelancerId: freelancer.id, coverLetter: body.coverLetter },
-      update: { coverLetter: body.coverLetter },
+      create: {
+        jobId: job.id,
+        freelancerId: freelancer.id,
+        coverLetter: body.coverLetter,
+        proposedMilestones: body.proposedMilestones ?? undefined,
+      },
+      update: {
+        coverLetter: body.coverLetter,
+        proposedMilestones: body.proposedMilestones ?? undefined,
+      },
     });
 
     res.status(201).json({ application });
@@ -176,7 +189,7 @@ router.post('/:id/hire', async (req, res, next) => {
           where: {
             jobId: req.params.id,
             id: { not: hiredApp.id },
-            status: { in: ['PENDING', 'SHORTLISTED'] },
+            status: { in: ['PENDING', 'SHORTLISTED', 'INTERVIEWING'] },
           },
           data: { status: 'REJECTED' },
         });
@@ -208,9 +221,10 @@ router.post('/:id/hire', async (req, res, next) => {
  */
 router.patch('/:id/applications/:appId', async (req, res, next) => {
   try {
-    const { status, clientWallet } = z.object({
-      status: z.enum(['SHORTLISTED', 'REJECTED']),
+    const { status, clientWallet, interviewNote } = z.object({
+      status: z.enum(['SHORTLISTED', 'INTERVIEWING', 'REJECTED']),
       clientWallet: z.string().min(1),
+      interviewNote: z.string().optional(),
     }).parse(req.body);
 
     const wallet = clientWallet.toLowerCase();
@@ -227,7 +241,7 @@ router.patch('/:id/applications/:appId', async (req, res, next) => {
     // Limit shortlisted to 3.
     if (status === 'SHORTLISTED') {
       const shortlisted = await prisma.application.count({
-        where: { jobId: req.params.id, status: 'SHORTLISTED' },
+        where: { jobId: req.params.id, status: { in: ['SHORTLISTED', 'INTERVIEWING'] } },
       });
       if (shortlisted >= 3) {
         return res.status(409).json({ error: 'Maximum 3 candidates can be shortlisted' });
@@ -236,7 +250,7 @@ router.patch('/:id/applications/:appId', async (req, res, next) => {
 
     const application = await prisma.application.update({
       where: { id: req.params.appId },
-      data: { status },
+      data: { status, ...(interviewNote !== undefined ? { interviewNote } : {}) },
       include: { freelancer: { select: { walletAddress: true } } },
     });
 

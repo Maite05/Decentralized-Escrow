@@ -40,9 +40,10 @@ export function Navbar({ backHref, backLabel = "Back" }: NavbarProps) {
           {!backHref && (
             <nav className="hidden sm:flex items-center gap-0.5 ml-2">
               {[
-                { href: "/",       label: "Dashboard"  },
-                { href: "/jobs",   label: "Jobs"       },
-                { href: "/create", label: "New Escrow" },
+                { href: "/",        label: "Dashboard"  },
+                { href: "/jobs",    label: "Jobs"       },
+                { href: "/talent",  label: "Talent"     },
+                { href: "/create",  label: "New Escrow" },
               ].map(({ href, label }) => (
                 <Link
                   key={href}

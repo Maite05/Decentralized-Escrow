@@ -1,14 +1,15 @@
 import type { NextPage } from "next";
 import Link from "next/link";
 import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useActiveAddress } from "../../hooks/useActiveAddress";
 import { Navbar } from "../../components/Navbar";
 import { useJobs, type Job } from "../../hooks/useJobs";
+import { FeeTag } from "../../components/FeeBreakdown";
 
 const Dashboard: NextPage = () => {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-  const { isConnected } = useAccount();
+  const { isConnected } = useActiveAddress();
   const { data, isLoading } = useJobs(query || undefined);
   const jobs = data?.jobs ?? [];
 
@@ -82,12 +83,9 @@ function JobCard({ job }: { job: Job }) {
               {job.client.walletAddress.slice(0, 6)}…{job.client.walletAddress.slice(-4)}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
             <span className="badge badge-blue">{job.budget} USDC</span>
-            <svg className="w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <FeeTag amount={job.budget} mode="client" />
           </div>
         </div>
 

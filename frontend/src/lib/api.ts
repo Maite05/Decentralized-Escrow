@@ -32,6 +32,8 @@ export interface EscrowProject {
   title?: string;
   description?: string;
   mediatorAddress?: string;
+  freelancerAccepted: boolean;
+  deadline?: string;
   client: { id: string; walletAddress: string };
   freelancer: { id: string; walletAddress: string };
   milestones: EscrowMilestone[];
@@ -158,6 +160,17 @@ export async function patch<T>(path: string, body: unknown): Promise<T> {
   });
   if (!res.ok) {
     throw new Error(`PATCH ${path} returned ${res.status}: ${res.statusText}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+/**
+ * Performs a DELETE request to the backend API.
+ */
+export async function del<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`DELETE ${path} returned ${res.status}: ${res.statusText}`);
   }
   return res.json() as Promise<T>;
 }

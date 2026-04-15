@@ -1,8 +1,8 @@
 import type { NextPage } from "next";
 import { useRouter } from "next/router";
-import { useAccount } from "wagmi";
+import { useActiveAddress } from "../../hooks/useActiveAddress";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Navbar } from "../../components/Navbar";
 import { MilestoneCard, type MilestoneData } from "../../components/MilestoneCard";
 import { AddMilestoneForm } from "../../components/AddMilestoneForm";
@@ -10,6 +10,8 @@ import { TxLog } from "../../components/TxLog";
 import { AIInsightPanel } from "../../components/AIInsightPanel";
 import { useProject, useMilestone, useMilestoneCount } from "../../hooks/useEscrow";
 import { useSocket } from "../../hooks/useSocket";
+import { useAcceptEscrow, useEscrowProjects } from "../../hooks/useJobs";
+import { calcFees, fmtUSDC, SEPOLIA_GAS_FEE_USD } from "../../lib/fees";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
@@ -85,14 +87,67 @@ function TimelineDot({ state, index, isLast }: { state: number; index: number; i
   );
 }
 
-function StatCard({ label, value, sub, mono = false }: {
-  label: string; value: string; sub?: string; mono?: boolean;
+function StatCard({ label, value, sub, mono = false, href }: {
+  label: string; value: string; sub?: string; mono?: boolean; href?: string;
 }) {
-  return (
+  const inner = (
     <div className="card p-4 space-y-1">
       <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">{label}</p>
-      <p className={`text-sm font-semibold text-slate-800 truncate ${mono ? "font-mono" : ""}`}>{value}</p>
+      <p className={`text-sm font-semibold text-slate-800 truncate ${mono ? "font-mono" : ""} ${href ? "text-indigo-600 hover:underline" : ""}`}>{value}</p>
       {sub && <p className="text-xs text-slate-400">{sub}</p>}
+    </div>
+  );
+  return href ? <a href={href} target="_blank" rel="noreferrer">{inner}</a> : inner;
+}
+
+function FeeSummaryPanel({
+  totalAmount,
+  milestoneCount,
+  escrowAddress,
+}: {
+  totalAmount: number;
+  milestoneCount: number;
+  escrowAddress: string;
+}) {
+  const fees = calcFees(totalAmount);
+  const gasTotal = milestoneCount * SEPOLIA_GAS_FEE_USD;
+
+  return (
+    <div className="rounded-xl border border-amber-300 bg-amber-50 p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+        </svg>
+        <h3 className="font-semibold text-amber-900 text-sm">Fee Summary</h3>
+        <a
+          href={`https://sepolia.etherscan.io/address/${escrowAddress}`}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-auto text-xs text-indigo-600 hover:underline font-mono"
+        >
+          View on Etherscan
+        </a>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <FeeStatCell label="Contract Value" value={`$${fmtUSDC(fees.grossAmount)}`} />
+        <FeeStatCell label="Client Pays (incl. 8%)" value={`$${fmtUSDC(fees.clientPays)}`} warn />
+        <FeeStatCell label="Platform Fee (8%)" value={`$${fmtUSDC(fees.platformFee)}`} warn />
+        <FeeStatCell label="Gas per Milestone" value={`$${fmtUSDC(SEPOLIA_GAS_FEE_USD)}`} warn />
+        <FeeStatCell label={`Total Gas (${milestoneCount} ms)`} value={`$${fmtUSDC(gasTotal)}`} warn />
+        <FeeStatCell label="Freelancer Net" value={`$${fmtUSDC(Math.max(0, fees.netPayout - (gasTotal - SEPOLIA_GAS_FEE_USD)))}`} positive />
+      </div>
+    </div>
+  );
+}
+
+function FeeStatCell({ label, value, warn, positive }: { label: string; value: string; warn?: boolean; positive?: boolean }) {
+  return (
+    <div className="bg-white/60 rounded-lg px-3 py-2 space-y-0.5">
+      <p className="text-xs text-amber-700">{label}</p>
+      <p className={`text-sm font-semibold font-mono tabular-nums ${positive ? "text-emerald-700" : warn ? "text-amber-900" : "text-slate-800"}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -107,7 +162,7 @@ function RoleBadge({ role }: { role: "Client" | "Freelancer" | "Mediator" }) {
 const EscrowDetail: NextPage = () => {
   const router        = useRouter();
   const escrowAddress = (router.query.id as `0x${string}`) ?? ZERO_ADDR;
-  const { address: connectedWallet } = useAccount();
+  const { address: connectedWallet } = useActiveAddress();
   const queryClient   = useQueryClient();
 
   const { data: projectData, isLoading: projectLoading } = useProject(escrowAddress);
@@ -126,6 +181,16 @@ const EscrowDetail: NextPage = () => {
   const budgetFormatted = totalAmount
     ? (Number(totalAmount) / 1e6).toLocaleString(undefined, { minimumFractionDigits: 2 })
     : "—";
+
+  // Backend project record (for freelancerAccepted flag)
+  const { data: projectsData } = useEscrowProjects(connectedWallet);
+  const backendProject = projectsData?.projects?.find(
+    (p) => p.escrowAddress.toLowerCase() === escrowAddress.toLowerCase()
+  );
+  const freelancerAccepted = backendProject?.freelancerAccepted ?? true; // default true if not found
+  const { mutate: acceptEscrow, isPending: isAccepting } = useAcceptEscrow();
+  const [accepted, setAccepted] = useState(false);
+  const showAcceptBanner = isFreelancer && !freelancerAccepted && !accepted;
 
   const { connected, milestoneEvent } = useSocket(router.isReady ? escrowAddress : null);
   useEffect(() => {
@@ -166,10 +231,52 @@ const EscrowDetail: NextPage = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Budget"     value={`${budgetFormatted} USDC`} />
             <StatCard label="Milestones" value={projectLoading ? "…" : milestoneCount.toString()} />
-            <StatCard label="Client"     value={client     === ZERO_ADDR ? "…" : shorten(client)}     mono />
-            <StatCard label="Freelancer" value={freelancer === ZERO_ADDR ? "…" : shorten(freelancer)} mono />
+            <StatCard
+              label="Client"
+              value={client === ZERO_ADDR ? "…" : shorten(client)}
+              mono
+              href={client !== ZERO_ADDR ? `https://sepolia.etherscan.io/address/${client}` : undefined}
+            />
+            <StatCard
+              label="Freelancer"
+              value={freelancer === ZERO_ADDR ? "…" : shorten(freelancer)}
+              mono
+              href={freelancer !== ZERO_ADDR ? `https://sepolia.etherscan.io/address/${freelancer}` : undefined}
+            />
           </div>
         </div>
+
+        {/* Freelancer acceptance banner */}
+        {showAcceptBanner && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-5 flex items-start gap-4">
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-amber-900">Accept this escrow to begin work</p>
+              <p className="text-sm text-amber-700 mt-0.5">
+                The client has funded the escrow. Review the milestones below, then confirm you accept the project terms and are ready to start.
+              </p>
+              <button
+                type="button"
+                disabled={isAccepting}
+                onClick={() => {
+                  if (!connectedWallet) return;
+                  acceptEscrow(
+                    { escrowAddress, freelancerWallet: connectedWallet },
+                    { onSuccess: () => setAccepted(true) }
+                  );
+                }}
+                className="mt-3 btn-primary text-sm"
+              >
+                {isAccepting ? "Confirming…" : "Accept & Start Project"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Role guide */}
         {role && (
@@ -187,6 +294,15 @@ const EscrowDetail: NextPage = () => {
               ? "As mediator, you can release funds to the freelancer or refund the client when a dispute is open."
               : "As freelancer, mark milestones delivered once complete. USDC releases after client approval."}
           </div>
+        )}
+
+        {/* Fee Summary Panel */}
+        {totalAmount > 0n && (
+          <FeeSummaryPanel
+            totalAmount={Number(totalAmount) / 1e6}
+            milestoneCount={milestoneCount}
+            escrowAddress={escrowAddress}
+          />
         )}
 
         {/* AI Insight */}

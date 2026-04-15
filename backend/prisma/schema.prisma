@@ -40,29 +40,57 @@ enum JobStatus {
   CLOSED
 }
 
+enum Availability {
+  AVAILABLE
+  BUSY
+  UNAVAILABLE
+}
+
 enum ApplicationStatus {
   PENDING
   SHORTLISTED
+  INTERVIEWING
   REJECTED
   HIRED
 }
 
 model User {
-  id            String   @id @default(cuid())
-  walletAddress String   @unique
-  role          Role     @default(CLIENT)
-  email         String?
+  id                String       @id @default(cuid())
+  walletAddress     String       @unique
+  role              Role         @default(CLIENT)
+  email             String?
   // Freelancer profile fields
-  bio           String?
-  skills        String[] @default([])
-  portfolioUrl  String?
-  createdAt     DateTime @default(now())
+  displayName       String?
+  tagline           String?      // One-liner: "Full-stack Web3 developer"
+  bio               String?
+  skills            String[]     @default([])
+  portfolioUrl      String?
+  hourlyRate        String?      // USDC per hour, stored as string
+  availability      Availability @default(AVAILABLE)
+  rating            Float?       // 0.0 – 5.0 average
+  completedProjects Int          @default(0)
+  totalEarned       String?      // Cumulative USDC earned, stored as string
+  createdAt         DateTime     @default(now())
 
-  clientProjects     Project[]     @relation("ClientProjects")
-  freelancerProjects Project[]     @relation("FreelancerProjects")
-  mediatedDisputes   Dispute[]     @relation("MediatorDisputes")
-  postedJobs         Job[]         @relation("PostedJobs")
+  clientProjects     Project[]       @relation("ClientProjects")
+  freelancerProjects Project[]       @relation("FreelancerProjects")
+  mediatedDisputes   Dispute[]       @relation("MediatorDisputes")
+  postedJobs         Job[]           @relation("PostedJobs")
   applications       Application[]
+  portfolioItems     PortfolioItem[]
+}
+
+model PortfolioItem {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  imageUrl    String?
+  projectUrl  String?
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Project {
@@ -72,10 +100,11 @@ model Project {
   freelancerId    String
   mediatorAddress String?
   status          ProjectStatus @default(ACTIVE)
-  title           String?
-  description     String?
-  totalAmount     String?
-  deadline        DateTime?
+  title               String?
+  description         String?
+  totalAmount         String?
+  deadline            DateTime?
+  freelancerAccepted  Boolean   @default(false)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -121,13 +150,15 @@ model Job {
 }
 
 model Application {
-  id           String            @id @default(cuid())
-  jobId        String
-  freelancerId String
-  coverLetter  String
-  status       ApplicationStatus @default(PENDING)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id                 String            @id @default(cuid())
+  jobId              String
+  freelancerId       String
+  coverLetter        String
+  status             ApplicationStatus @default(PENDING)
+  interviewNote      String?           // Client's note after interview
+  proposedMilestones Json?             // Freelancer's proposed stages: [{description, amount, dueDate?}]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   job        Job  @relation(fields: [jobId], references: [id])
   freelancer User @relation(fields: [freelancerId], references: [id])

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
 import { useEscrowWrite } from "../hooks/useEscrowWrite";
 import { syncMilestoneAction, syncDisputeRaised } from "../lib/backendSync";
+import { FeeBreakdown } from "./FeeBreakdown";
 
 // 0=LOCKED 1=DELIVERED 2=RELEASED 3=DISPUTED 4=REFUNDED
 const STATE_LABELS = ["Locked", "Delivered", "Released", "Disputed", "Refunded"] as const;
@@ -24,6 +25,7 @@ export interface MilestoneData {
   description: string;
   clientApproved?: boolean;
   freelancerDelivered?: boolean;
+  dueDate?: string; // ISO string from backend
 }
 
 interface Props {
@@ -91,13 +93,27 @@ export function MilestoneCard({
             <span className="text-xs font-mono text-slate-400">#{Number(milestone.id) + 1}</span>
             <p className="font-medium text-slate-800 text-sm">{milestone.description}</p>
           </div>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="text-sm text-slate-500 mt-0.5 flex items-center flex-wrap gap-x-2">
             <span className="font-semibold text-slate-700">{amountUSDC} USDC</span>
             {milestone.state === 2 && milestone.deliveredAt > 0n && (
-              <span className="ml-2 text-slate-400">
+              <span className="text-slate-400">
                 · released {new Date(Number(milestone.deliveredAt) * 1000).toLocaleDateString()}
               </span>
             )}
+            {milestone.dueDate && milestone.state < 2 && (() => {
+              const due = new Date(milestone.dueDate);
+              const now = new Date();
+              const overdue = due < now;
+              return (
+                <span className={`flex items-center gap-1 text-xs font-medium ${overdue ? "text-red-500" : "text-slate-400"}`}>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {overdue ? "Overdue · " : "Due "}{due.toLocaleDateString()}
+                </span>
+              );
+            })()}
           </p>
         </div>
         <span className={`badge ${badgeClass} shrink-0`}>{stateLabel}</span>
@@ -155,6 +171,17 @@ export function MilestoneCard({
           </span>
         </div>
       </div>
+
+      {/* Fee breakdown — freelancer sees their net payout; client sees net note on delivered */}
+      {isFreelancer && milestone.state < 2 && (
+        <FeeBreakdown amount={amountUSDC} mode="freelancer" collapsed />
+      )}
+      {isClient && milestone.state === 1 && (
+        <FeeBreakdown amount={amountUSDC} mode="client" collapsed />
+      )}
+      {milestone.state === 2 && (
+        <FeeBreakdown amount={amountUSDC} mode="freelancer" collapsed={false} />
+      )}
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-2">

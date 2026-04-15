@@ -1,14 +1,14 @@
 import type { NextPage } from "next";
 import Link from "next/link";
-import { useAccount } from "wagmi";
 import { Navbar } from "../components/Navbar";
 import { TxLog } from "../components/TxLog";
 import { useWallet } from "../hooks/useWallet";
 import { useDashboard } from "../hooks/useJobs";
+import { useActiveAddress } from "../hooks/useActiveAddress";
 import type { EscrowProject } from "../lib/api";
 
 const Dashboard: NextPage = () => {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useActiveAddress();
   const { data: dash, isLoading } = useDashboard(address);
 
   if (!isConnected) return <LandingPage />;
