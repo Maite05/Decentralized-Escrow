@@ -34,6 +34,12 @@ enum DisputeStatus {
   CANCELLED
 }
 
+enum JobStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
 model User {
   id            String   @id @default(cuid())
   walletAddress String   @unique
@@ -41,9 +47,11 @@ model User {
   email         String?
   createdAt     DateTime @default(now())
 
-  clientProjects     Project[] @relation("ClientProjects")
-  freelancerProjects Project[] @relation("FreelancerProjects")
-  mediatedDisputes   Dispute[] @relation("MediatorDisputes")
+  clientProjects     Project[]     @relation("ClientProjects")
+  freelancerProjects Project[]     @relation("FreelancerProjects")
+  mediatedDisputes   Dispute[]     @relation("MediatorDisputes")
+  postedJobs         Job[]         @relation("PostedJobs")
+  applications       Application[]
 }
 
 model Project {
@@ -76,6 +84,35 @@ model Milestone {
   project Project @relation(fields: [projectId], references: [id])
 
   @@unique([projectId, milestoneIndex])
+}
+
+model Job {
+  id           String    @id @default(cuid())
+  clientId     String
+  title        String
+  description  String
+  budget       String
+  skills       String[]
+  status       JobStatus @default(OPEN)
+  escrowAddress String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  client       User          @relation("PostedJobs", fields: [clientId], references: [id])
+  applications Application[]
+}
+
+model Application {
+  id           String   @id @default(cuid())
+  jobId        String
+  freelancerId String
+  coverLetter  String
+  createdAt    DateTime @default(now())
+
+  job        Job  @relation(fields: [jobId], references: [id])
+  freelancer User @relation(fields: [freelancerId], references: [id])
+
+  @@unique([jobId, freelancerId])
 }
 
 model Dispute {
