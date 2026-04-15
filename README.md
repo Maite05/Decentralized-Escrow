@@ -110,20 +110,20 @@ Decentralized-Escrow/
 
 ## Deployment Addresses
 
-> Deployed on **X Layer Mainnet** (Chain ID: 196) — addresses updated after deployment.
+> Deployed on **X Layer Testnet** (Chain ID: 1952) on 2026-04-15.
 
 | Contract | Address |
 |---|---|
-| `MediatorRegistry` | `TBD — run npm run deploy -w contracts` |
-| `EscrowFactory` | `TBD — run npm run deploy -w contracts` |
+| `MediatorRegistry` | [`0x152f000db4B13053462C9068f0532819461469f0`](https://www.okx.com/explorer/xlayer-test/address/0x152f000db4B13053462C9068f0532819461469f0) |
+| `EscrowFactory` | [`0x460869Ff5601578e1b84D720103BcF03D3d9fcf7`](https://www.okx.com/explorer/xlayer-test/address/0x460869Ff5601578e1b84D720103BcF03D3d9fcf7) |
 
 Network details:
 
 ```
-Network:  X Layer Mainnet
-Chain ID: 196
-RPC:      https://rpc.xlayer.tech
-Explorer: https://www.oklink.com/xlayer
+Network:  X Layer Testnet
+Chain ID: 1952
+RPC:      https://testrpc.xlayer.tech
+Explorer: https://www.okx.com/explorer/xlayer-test
 ```
 
 ---
@@ -175,9 +175,10 @@ Each `/ai/risk/:projectId` request is gated by an **x402 payment header**. The f
 ### Raising and resolving a dispute
 
 1. Either party calls `raiseDispute(milestoneId)` — state → `DISPUTED`.
-2. An approved mediator (staked in `MediatorRegistry`) calls `resolveDispute(milestoneId, freelancerWon)`.
-   - `true` → funds released to freelancer, state → `RELEASED`.
-   - `false` → funds refunded to client, state → `REFUNDED`.
+2. An approved mediator (staked in `MediatorRegistry`) calls `resolveDispute(milestoneId, freelancerShare, clientShare)`.
+   - Shares must sum to the milestone amount — enabling proportional splits (e.g., 60 / 40).
+   - Full freelancer award (`amount, 0`) → state → `RELEASED`.
+   - Full client refund (`0, amount`) → state → `REFUNDED`.
 3. The Agentic Wallet mediator can resolve disputes autonomously based on on-chain evidence surfaced by the Onchain OS MCP skill.
 
 ### AI risk panel
