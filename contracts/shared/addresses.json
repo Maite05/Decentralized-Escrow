@@ -1,6 +1,6 @@
 {
-  "mediatorRegistry": "",
-  "escrowFactory": "",
-  "network": "",
-  "deployedAt": ""
+  "mediatorRegistry": "0x152f000db4B13053462C9068f0532819461469f0",
+  "escrowFactory": "0x460869Ff5601578e1b84D720103BcF03D3d9fcf7",
+  "network": "xlayerTestnet",
+  "deployedAt": "2026-04-15T09:29:34.856Z"
 }

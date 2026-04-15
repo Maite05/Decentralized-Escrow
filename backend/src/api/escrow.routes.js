@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { getIO } from '../index.js';
+import { getIO } from '../lib/io.js';
 import { enqueueNotification } from '../jobs/notificationQueue.js';
 import { x402 } from '../lib/x402.js';
 

@@ -1,11 +1,13 @@
-import type { NextConfig } from "next";
 import path from "path";
+import { fileURLToPath } from "url";
 
-const nextConfig: NextConfig = {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   webpack(config) {
     config.resolve.alias = {
       ...config.resolve.alias,
-      // @contracts → contracts/shared — resolved relative to the monorepo root
       "@contracts": path.resolve(__dirname, "../contracts/shared"),
     };
     return config;

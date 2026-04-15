@@ -28,6 +28,13 @@ let worker = null;
 let usingInMemoryFallback = false;
 
 function createQueue() {
+  // Skip Redis entirely if REDIS_HOST is not configured.
+  if (!process.env.REDIS_HOST) {
+    console.log('[NotificationQueue] REDIS_HOST not set — using in-memory queue.');
+    enableInMemoryFallback();
+    return;
+  }
+
   try {
     queue = new Queue(QUEUE_NAME, {
       connection: redisConnection,
@@ -57,9 +64,17 @@ function createQueue() {
       );
     });
 
-    queue.on('error', (err) => {
-      console.error('[NotificationQueue] Queue error:', err.message);
-    });
+    // Handle async connection errors by falling back to in-memory.
+    const onError = (err) => {
+      if (!usingInMemoryFallback) {
+        console.warn('[NotificationQueue] Redis error — switching to in-memory queue:', err.message);
+        worker?.close().catch(() => {});
+        queue?.close().catch(() => {});
+        enableInMemoryFallback();
+      }
+    };
+    queue.on('error', onError);
+    worker.on('error', onError);
 
     console.log('[NotificationQueue] BullMQ queue connected to Redis.');
   } catch (err) {

@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import { setIO } from './lib/io.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -12,14 +13,8 @@ const io = new Server(httpServer, {
   cors: { origin: FRONTEND_URL, methods: ['GET', 'POST'] },
 });
 
-/**
- * Expose the Socket.io instance to route handlers.
- * Call getIO() in routes instead of importing io directly to avoid
- * circular-import issues.
- */
-export function getIO() {
-  return io;
-}
+// Make the io instance available to route handlers without circular imports.
+setIO(io);
 
 app.use(cors({ origin: FRONTEND_URL }));
 app.use(express.json());

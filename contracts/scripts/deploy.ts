@@ -8,9 +8,20 @@ async function main(): Promise<void> {
   console.log(`Network: ${network.name}`);
 
   // Set STAKE_TOKEN_ADDRESS in .env — address of the ERC-20 used for mediator stakes.
-  const stakeTokenAddress = process.env.STAKE_TOKEN_ADDRESS;
+  // On testnet, if not set, deploy MockERC20 and use its address automatically.
+  let stakeTokenAddress = process.env.STAKE_TOKEN_ADDRESS;
   if (!stakeTokenAddress) {
-    throw new Error("STAKE_TOKEN_ADDRESS is not set in .env");
+    const isTestnet = network.name === "xlayerTestnet" || network.name === "hardhat" || network.name === "localhost";
+    if (!isTestnet) {
+      throw new Error("STAKE_TOKEN_ADDRESS is not set in .env — required for mainnet deploys");
+    }
+    console.log("\n[0/2] STAKE_TOKEN_ADDRESS not set — deploying MockERC20 for testnet...");
+    const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+    const mock = await MockERC20Factory.deploy("Mock USDC", "mUSDC", 6);
+    await mock.waitForDeployment();
+    stakeTokenAddress = await mock.getAddress();
+    console.log(`  MockERC20 deployed at: ${stakeTokenAddress}`);
+    console.log(`  Add to .env: STAKE_TOKEN_ADDRESS=${stakeTokenAddress}`);
   }
 
   // FEE_RECIPIENT: wallet that collects the 5% protocol fee on each milestone release.

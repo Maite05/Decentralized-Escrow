@@ -15,13 +15,17 @@ async function verifyContract(
 ): Promise<void> {
   console.log(`\nVerifying ${address} ...`);
   try {
-    await run("verify:verify", {
+    await run("okverify", {
       address,
-      constructorArguments: constructorArgs,
+      constructorArgsParams: constructorArgs.map(String),
     });
     console.log(`  ✓ Verified`);
   } catch (err: unknown) {
-    if (err instanceof Error && err.message.includes("Already Verified")) {
+    if (
+      err instanceof Error &&
+      (err.message.includes("Already Verified") ||
+        err.message.includes("already verified"))
+    ) {
       console.log("  Already verified — skipping.");
     } else {
       throw err;

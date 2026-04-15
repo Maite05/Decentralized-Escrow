@@ -1,5 +1,6 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "@okxweb3/hardhat-explorer-verify";
 import * as dotenv from "dotenv";
 import path from "path";
 
@@ -81,6 +82,9 @@ const config: HardhatUserConfig = {
         },
       },
     ],
+  },
+  okxweb3explorer: {
+    apiKey: OKLINK_API_KEY,
   },
   typechain: {
     outDir: "typechain-types",
