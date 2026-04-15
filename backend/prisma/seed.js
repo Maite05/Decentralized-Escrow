@@ -84,66 +84,100 @@ async function main() {
     }),
   ]);
 
+  const freelancerFields = (overrides) => ({
+    role: "FREELANCER",
+    availability: "AVAILABLE",
+    completedProjects: 0,
+    rating: 0,
+    totalEarned: "0",
+    ...overrides,
+  });
+
   const [fDaniel, fEve, fFrank, fGrace, fHenry] = await Promise.all([
     prisma.user.upsert({
       where:  { walletAddress: WALLETS.devDaniel },
-      update: {},
-      create: {
+      update: {
+        displayName: "Daniel Park", tagline: "Senior Solidity engineer & DeFi security specialist",
+        hourlyRate: "140", availability: "AVAILABLE", completedProjects: 18, rating: 4.9, totalEarned: "87200",
+      },
+      create: freelancerFields({
         walletAddress: WALLETS.devDaniel,
-        role:  "FREELANCER",
         email: "daniel@0xdev.io",
-        bio:   "Senior Solidity engineer, 6 yrs exp. Audited 30+ contracts. Specialises in DeFi vaults and gas optimisation.",
+        displayName: "Daniel Park",
+        tagline: "Senior Solidity engineer & DeFi security specialist",
+        bio: "Senior Solidity engineer, 6 yrs exp. Audited 30+ contracts. Specialises in DeFi vaults and gas optimisation.",
         skills: ["Solidity", "Hardhat", "DeFi", "ERC-20", "OpenZeppelin", "Foundry"],
         portfolioUrl: "https://github.com/0xDaniel",
-      },
+        hourlyRate: "140", completedProjects: 18, rating: 4.9, totalEarned: "87200",
+      }),
     }),
     prisma.user.upsert({
       where:  { walletAddress: WALLETS.devEve },
-      update: {},
-      create: {
+      update: {
+        displayName: "Eve Larsson", tagline: "Full-stack Web3 developer · React + wagmi",
+        hourlyRate: "100", availability: "BUSY", completedProjects: 11, rating: 4.8, totalEarned: "52000",
+      },
+      create: freelancerFields({
         walletAddress: WALLETS.devEve,
-        role:  "FREELANCER",
         email: "eve@web3ui.dev",
-        bio:   "Full-stack Web3 developer. React + wagmi + Next.js. Open to long-term retainers.",
+        displayName: "Eve Larsson",
+        tagline: "Full-stack Web3 developer · React + wagmi",
+        bio: "Full-stack Web3 developer. React + wagmi + Next.js. Open to long-term retainers.",
         skills: ["React", "Next.js", "wagmi", "TypeScript", "TailwindCSS", "ethers.js"],
         portfolioUrl: "https://github.com/0xEve",
-      },
+        hourlyRate: "100", completedProjects: 11, rating: 4.8, totalEarned: "52000", availability: "BUSY",
+      }),
     }),
     prisma.user.upsert({
       where:  { walletAddress: WALLETS.devFrank },
-      update: {},
-      create: {
+      update: {
+        displayName: "Frank Osei", tagline: "Backend & subgraph engineer for Web3",
+        hourlyRate: "90", availability: "AVAILABLE", completedProjects: 7, rating: 4.6, totalEarned: "29400",
+      },
+      create: freelancerFields({
         walletAddress: WALLETS.devFrank,
-        role:  "FREELANCER",
         email: "frank@chainback.dev",
-        bio:   "Backend engineer specialising in Node.js APIs, subgraphs, and indexers for Web3 apps.",
+        displayName: "Frank Osei",
+        tagline: "Backend & subgraph engineer for Web3",
+        bio: "Backend engineer specialising in Node.js APIs, subgraphs, and indexers for Web3 apps.",
         skills: ["Node.js", "GraphQL", "The Graph", "PostgreSQL", "Docker", "Redis"],
         portfolioUrl: "https://github.com/0xFrank",
-      },
+        hourlyRate: "90", completedProjects: 7, rating: 4.6, totalEarned: "29400",
+      }),
     }),
     prisma.user.upsert({
       where:  { walletAddress: WALLETS.devGrace },
-      update: {},
-      create: {
+      update: {
+        displayName: "Grace Kim", tagline: "Token economist & whitepaper author",
+        hourlyRate: "110", availability: "AVAILABLE", completedProjects: 12, rating: 4.7, totalEarned: "41800",
+      },
+      create: freelancerFields({
         walletAddress: WALLETS.devGrace,
-        role:  "FREELANCER",
         email: "grace@tokenomix.io",
-        bio:   "Token economist and whitepaper author. Helped design tokenomics for 12 mainnet launches.",
+        displayName: "Grace Kim",
+        tagline: "Token economist & whitepaper author",
+        bio: "Token economist and whitepaper author. Helped design tokenomics for 12 mainnet launches.",
         skills: ["Tokenomics", "Whitepaper", "Game Theory", "Economic Modelling", "Python"],
         portfolioUrl: "https://github.com/0xGrace",
-      },
+        hourlyRate: "110", completedProjects: 12, rating: 4.7, totalEarned: "41800",
+      }),
     }),
     prisma.user.upsert({
       where:  { walletAddress: WALLETS.devHenry },
-      update: {},
-      create: {
+      update: {
+        displayName: "Henry Addo", tagline: "React Native & Web3 mobile developer",
+        hourlyRate: "85", availability: "AVAILABLE", completedProjects: 4, rating: 4.5, totalEarned: "18500",
+      },
+      create: freelancerFields({
         walletAddress: WALLETS.devHenry,
-        role:  "FREELANCER",
         email: "henry@mobiledapp.dev",
-        bio:   "React Native + Expo developer. Shipped 4 production Web3 mobile apps.",
+        displayName: "Henry Addo",
+        tagline: "React Native & Web3 mobile developer",
+        bio: "React Native + Expo developer. Shipped 4 production Web3 mobile apps.",
         skills: ["React Native", "Expo", "iOS", "Android", "WalletConnect", "TypeScript"],
         portfolioUrl: "https://github.com/0xHenry",
-      },
+        hourlyRate: "85", completedProjects: 4, rating: 4.5, totalEarned: "18500",
+      }),
     }),
   ]);
 
@@ -295,6 +329,93 @@ async function main() {
     },
   });
 
+  // ── Demo wallet OPEN jobs (Alice & Priya as clients) ────────────────────────
+  // These show on the Job Board and give demo clients visible listings to manage.
+  // Seeded lazily — look up demo users after they're created in section 6.
+  // We create these here so applications can reference them below.
+  // Upsert demo clients early so their IDs are available for job creation below.
+  // Section 7 will later enrich these records with displayName, tagline, etc.
+  const [dAlice, dPriya] = await Promise.all([
+    prisma.user.upsert({
+      where:  { walletAddress: "0x742d35cc6634c0532925a3b844bc454e4438f44e" },
+      update: {},
+      create: { walletAddress: "0x742d35cc6634c0532925a3b844bc454e4438f44e", role: "CLIENT", email: "alice@demo.escrow",
+                bio: "DeFi product lead looking for top Web3 talent.", skills: ["Product Management", "Web3", "DeFi"] },
+    }),
+    prisma.user.upsert({
+      where:  { walletAddress: "0xab5801a7d398351b8be11c439e05c5b3259aec9b" },
+      update: {},
+      create: { walletAddress: "0xab5801a7d398351b8be11c439e05c5b3259aec9b", role: "CLIENT", email: "priya@demo.escrow",
+                bio: "NFT marketplace founder hiring designers and engineers.", skills: ["NFT", "Community", "Marketplace"] },
+    }),
+  ]);
+
+  // Alice's open jobs (2 listings, fresh)
+  const jobA1 = dAlice ? await prisma.job.upsert({
+    where: { id: "demo_job_a01" },
+    update: {},
+    create: {
+      id:          "demo_job_a01",
+      clientId:    dAlice.id,
+      title:       "Solidity Developer for DeFi Staking Protocol",
+      description: "We are building a multi-asset staking protocol on Ethereum. Looking for an experienced Solidity developer to implement reward distribution, lock-up periods, and emergency withdrawal logic. Must include full Foundry test suite.",
+      budget:      "3500",
+      skills:      ["Solidity", "DeFi", "Foundry", "ERC-20", "Staking"],
+      status:      "OPEN",
+      deadline:    daysAhead(21),
+      createdAt:   daysAgo(3),
+    },
+  }) : null;
+
+  const jobA2 = dAlice ? await prisma.job.upsert({
+    where: { id: "demo_job_a02" },
+    update: {},
+    create: {
+      id:          "demo_job_a02",
+      clientId:    dAlice.id,
+      title:       "Frontend Developer — DeFi Dashboard (Next.js + wagmi)",
+      description: "Build a clean, responsive dashboard for our DeFi protocol. Users need to see their staked positions, pending rewards, APY, and transaction history. Stack: Next.js 14, wagmi v2, Tailwind CSS. Figma file provided.",
+      budget:      "2200",
+      skills:      ["React", "Next.js", "wagmi", "TypeScript", "TailwindCSS", "DeFi"],
+      status:      "OPEN",
+      deadline:    daysAhead(14),
+      createdAt:   daysAgo(1),
+    },
+  }) : null;
+
+  // Priya's open jobs (2 listings)
+  const jobP1 = dPriya ? await prisma.job.upsert({
+    where: { id: "demo_job_p01" },
+    update: {},
+    create: {
+      id:          "demo_job_p01",
+      clientId:    dPriya.id,
+      title:       "Smart Contract — ERC-721 NFT Collection with Allowlist",
+      description: "Need a gas-optimised ERC-721A contract for a 5,000-piece generative NFT drop. Features: Merkle-proof allowlist, public mint, reveal mechanic, royalty (EIP-2981), owner withdrawal. Full Hardhat test suite required.",
+      budget:      "1800",
+      skills:      ["Solidity", "NFT", "ERC-721", "Hardhat", "OpenZeppelin"],
+      status:      "OPEN",
+      deadline:    daysAhead(10),
+      createdAt:   daysAgo(4),
+    },
+  }) : null;
+
+  const jobP2 = dPriya ? await prisma.job.upsert({
+    where: { id: "demo_job_p02" },
+    update: {},
+    create: {
+      id:          "demo_job_p02",
+      clientId:    dPriya.id,
+      title:       "UI/UX Designer — NFT Marketplace Redesign",
+      description: "Our marketplace needs a full visual refresh. Looking for a Web3-savvy designer to create high-fidelity Figma mockups for: landing page, collection page, item detail, wallet connect flow, and profile page. Inspiration: OpenSea, Blur.",
+      budget:      "1400",
+      skills:      ["UI/UX", "Figma", "Web3 UX", "Design Systems"],
+      status:      "OPEN",
+      deadline:    daysAhead(18),
+      createdAt:   daysAgo(2),
+    },
+  }) : null;
+
   console.log("✓  Jobs created/updated");
 
   // ── 3. Applications ──────────────────────────────────────────────────────────
@@ -348,9 +469,87 @@ async function main() {
       coverLetter: "I've written NatSpec for 5 contract suites and built two Docusaurus sites for DeFi protocols. Technical writing is something I genuinely enjoy and I deliver clean, developer-friendly docs." },
   ];
 
+  // Demo wallet applications — added separately because they depend on dAlice/dPriya/demo freelancers
+  // We look up the demo freelancer users by address after the demo wallet section runs.
+  // These are appended to the upsert loop below.
+
   for (const app of apps) {
     await prisma.application.upsert({
       where: { id: app.id },
+      update: { status: app.status },
+      create: {
+        id:           app.id,
+        jobId:        app.jobId,
+        freelancerId: app.freelancerId,
+        coverLetter:  app.coverLetter,
+        status:       app.status,
+      },
+    });
+  }
+
+  // Demo wallet job applications (Bob, Carol, Dave, Elena apply to Alice's & Priya's jobs)
+  // Upsert demo freelancers early so their IDs are available for applications.
+  // Section 7 enriches these records with full profile data.
+  const [dBob, dCarol, dDave, dElena] = await Promise.all([
+    prisma.user.upsert({
+      where:  { walletAddress: "0x1234567890123456789012345678901234567890" },
+      update: {},
+      create: { walletAddress: "0x1234567890123456789012345678901234567890", role: "FREELANCER", email: "bob@demo.escrow",
+                bio: "Full-stack Web3 developer.", skills: ["React", "Next.js", "Solidity", "TypeScript"] },
+    }),
+    prisma.user.upsert({
+      where:  { walletAddress: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd" },
+      update: {},
+      create: { walletAddress: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd", role: "FREELANCER", email: "carol@demo.escrow",
+                bio: "UI/UX designer for Web3.", skills: ["UI/UX", "Figma", "React", "Tailwind CSS"] },
+    }),
+    prisma.user.upsert({
+      where:  { walletAddress: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" },
+      update: {},
+      create: { walletAddress: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", role: "FREELANCER", email: "dave@demo.escrow",
+                bio: "Solidity engineer & DeFi protocol architect.", skills: ["Solidity", "Foundry", "DeFi", "Auditing"] },
+    }),
+    prisma.user.upsert({
+      where:  { walletAddress: "0x5b38da6a701c568545dcfcb03fcb875f56beddc4" },
+      update: {},
+      create: { walletAddress: "0x5b38da6a701c568545dcfcb03fcb875f56beddc4", role: "FREELANCER", email: "elena@demo.escrow",
+                bio: "Python engineer & blockchain data analyst.", skills: ["Python", "The Graph", "Node.js", "GraphQL"] },
+    }),
+  ]);
+
+  const demoApps = [
+    // Alice's Solidity job — Dave shortlisted, Daniel pending
+    jobA1 && dDave  ? { id: "demo_app_a01", jobId: jobA1.id, freelancerId: dDave.id,  status: "SHORTLISTED",
+      coverLetter: "Staking protocols are my speciality — I've shipped two multi-asset staking systems on mainnet with full Foundry fuzz coverage. I can deliver clean, gas-optimised Solidity and a comprehensive audit report within your timeline." } : null,
+    jobA1 && fDaniel ? { id: "demo_app_a02", jobId: jobA1.id, freelancerId: fDaniel.id, status: "PENDING",
+      coverLetter: "I've built staking reward logic for three DeFi projects. My test suites consistently achieve 100% branch coverage with Foundry. Happy to share audit reports from previous work." } : null,
+    jobA1 && dElena ? { id: "demo_app_a03", jobId: jobA1.id, freelancerId: dElena.id, status: "PENDING",
+      coverLetter: "While my main background is backend and data, I have solid Solidity fundamentals and have contributed to staking contract reviews. Looking to take a leading role on a contract like this." } : null,
+
+    // Alice's frontend job — Bob shortlisted, Eve pending
+    jobA2 && dBob  ? { id: "demo_app_a04", jobId: jobA2.id, freelancerId: dBob.id,  status: "SHORTLISTED",
+      coverLetter: "DeFi dashboards are my bread and butter — I've built 3 in the last year using exactly your stack (Next.js 14, wagmi v2, Tailwind). I work fast, write clean code, and communicate clearly. Portfolio on request." } : null,
+    jobA2 && fEve  ? { id: "demo_app_a05", jobId: jobA2.id, freelancerId: fEve.id,  status: "PENDING",
+      coverLetter: "I've built two DeFi frontends with wagmi v2 and Next.js 14. My work is pixel-perfect on Figma handoffs and I focus on loading performance and smooth wallet interactions." } : null,
+
+    // Priya's NFT contract job — Dave shortlisted, Daniel shortlisted, Bob pending
+    jobP1 && dDave  ? { id: "demo_app_p01", jobId: jobP1.id, freelancerId: dDave.id,  status: "SHORTLISTED",
+      coverLetter: "I've written 8 ERC-721A contracts for NFT collections, including two with Merkle-proof allowlists. Gas optimisation is a priority for me — my last mint contract saved holders 30% vs. standard OpenZeppelin ERC-721." } : null,
+    jobP1 && fDaniel ? { id: "demo_app_p02", jobId: jobP1.id, freelancerId: fDaniel.id, status: "SHORTLISTED",
+      coverLetter: "NFT contract security is something I care deeply about. I can deliver the contract with a built-in security review — past clients have appreciated getting both the code and the audit in one engagement." } : null,
+    jobP1 && dBob  ? { id: "demo_app_p03", jobId: jobP1.id, freelancerId: dBob.id,  status: "PENDING",
+      coverLetter: "I've shipped 4 NFT contracts with allowlist mechanics. I write clean Hardhat tests with 100% statement coverage. Available to start immediately." } : null,
+
+    // Priya's UI/UX job — Carol shortlisted, Grace pending
+    jobP2 && dCarol ? { id: "demo_app_p04", jobId: jobP2.id, freelancerId: dCarol.id, status: "SHORTLISTED",
+      coverLetter: "Web3 UX is what I specialise in. I have redesigned two NFT marketplace UIs — both improved conversion by 25%+. I work in Figma with a component-first approach and hand off production-ready design tokens." } : null,
+    jobP2 && fGrace ? { id: "demo_app_p05", jobId: jobP2.id, freelancerId: fGrace.id, status: "PENDING",
+      coverLetter: "My background is economic design but I have a strong visual sensibility and have art-directed two product launches. I understand NFT collector psychology and can design UX that converts." } : null,
+  ].filter(Boolean);
+
+  for (const app of demoApps) {
+    await prisma.application.upsert({
+      where:  { id: app.id },
       update: { status: app.status },
       create: {
         id:           app.id,

@@ -1,6 +1,6 @@
 import type { NextPage } from "next";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useActiveAddress } from "../../hooks/useActiveAddress";
 import { Navbar } from "../../components/Navbar";
 import { useJobs, type Job } from "../../hooks/useJobs";
@@ -9,8 +9,11 @@ import { FeeTag } from "../../components/FeeBreakdown";
 const Dashboard: NextPage = () => {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
+  const [mounted, setMounted] = useState(false);
   const { isConnected } = useActiveAddress();
   const { data, isLoading } = useJobs(query || undefined);
+
+  useEffect(() => { setMounted(true); }, []);
   const jobs = data?.jobs ?? [];
 
   return (
@@ -25,7 +28,7 @@ const Dashboard: NextPage = () => {
               Find freelance work or hire talent
             </p>
           </div>
-          {isConnected && (
+          {mounted && isConnected && (
             <Link href="/jobs/post" className="btn-primary shrink-0">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -54,8 +57,8 @@ const Dashboard: NextPage = () => {
           )}
         </form>
 
-        {/* List */}
-        {isLoading ? (
+        {/* List — deferred until mounted to avoid SSR/client mismatch */}
+        {!mounted || isLoading ? (
           <LoadingSkeleton />
         ) : jobs.length === 0 ? (
           <EmptyState hasQuery={!!query} />

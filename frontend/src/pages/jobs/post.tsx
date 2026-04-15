@@ -1,6 +1,6 @@
 import type { NextPage } from "next";
 import { useRouter } from "next/router";
-import { useState, KeyboardEvent } from "react";
+import { useState, useEffect, KeyboardEvent } from "react";
 import { useActiveAddress } from "../../hooks/useActiveAddress";
 import { Navbar } from "../../components/Navbar";
 import { usePostJob } from "../../hooks/useJobs";
@@ -8,8 +8,11 @@ import { FeeBreakdown } from "../../components/FeeBreakdown";
 
 const PostJob: NextPage = () => {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const { address, isConnected } = useActiveAddress();
   const { mutateAsync: postJob, isPending } = usePostJob();
+
+  useEffect(() => { setMounted(true); }, []);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -55,7 +58,7 @@ const PostJob: NextPage = () => {
     }
   }
 
-  if (!isConnected) {
+  if (!mounted || !isConnected) {
     return (
       <>
         <Navbar backHref="/jobs" backLabel="Job Board" />

@@ -199,6 +199,10 @@ export function useUpdateProfile() {
       skills?: string[];
       portfolioUrl?: string;
       email?: string;
+      displayName?: string;
+      tagline?: string;
+      hourlyRate?: string;
+      availability?: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
     }) => patch<{ user: FreelancerProfile }>(`/auth/profile/${address}`, body),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["profile", vars.address] }),
   });

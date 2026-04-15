@@ -1,6 +1,6 @@
 import type { NextPage } from "next";
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useActiveAddress } from "../../hooks/useActiveAddress";
 import { Navbar } from "../../components/Navbar";
 import {
@@ -25,9 +25,14 @@ const ProfilePage: NextPage = () => {
       ? router.query.address.toLowerCase()
       : undefined;
 
+  const [mounted, setMounted] = useState(false);
   const { address: connectedAddress } = useActiveAddress();
+
+  useEffect(() => { setMounted(true); }, []);
+
+  // Only compute isOwner after client-side hydration to avoid server/client mismatch.
   const isOwner =
-    !!connectedAddress && !!address &&
+    mounted && !!connectedAddress && !!address &&
     connectedAddress.toLowerCase() === address;
 
   const { data, isLoading } = useFreelancerProfile(address);

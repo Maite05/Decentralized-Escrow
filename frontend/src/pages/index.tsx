@@ -1,5 +1,6 @@
 import type { NextPage } from "next";
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import { Navbar } from "../components/Navbar";
 import { TxLog } from "../components/TxLog";
 import { useWallet } from "../hooks/useWallet";
@@ -8,10 +9,14 @@ import { useActiveAddress } from "../hooks/useActiveAddress";
 import type { EscrowProject } from "../lib/api";
 
 const Dashboard: NextPage = () => {
+  const [mounted, setMounted] = useState(false);
   const { address, isConnected } = useActiveAddress();
   const { data: dash, isLoading } = useDashboard(address);
 
-  if (!isConnected) return <LandingPage />;
+  useEffect(() => { setMounted(true); }, []);
+
+  // Before hydration completes always render LandingPage so server and client match.
+  if (!mounted || !isConnected) return <LandingPage />;
 
   const clientProjects     = dash?.projects.filter((p) => p.client.walletAddress === address?.toLowerCase()) ?? [];
   const freelancerProjects = dash?.projects.filter((p) => p.freelancer.walletAddress === address?.toLowerCase()) ?? [];
@@ -259,7 +264,9 @@ function StatTile({ label, value, sub, color, href }: {
 
 // ─── Landing page ──────────────────────────────────────────────────────────────
 function LandingPage() {
+  const [mounted, setMounted] = useState(false);
   const { connect, connectors } = useWallet();
+  useEffect(() => { setMounted(true); }, []);
 
   return (
     <>
@@ -281,7 +288,7 @@ function LandingPage() {
               No middleman — just smart contracts and trust.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {connectors.map((c) => (
+              {mounted ? connectors.map((c) => (
                 <button
                   key={c.id}
                   type="button"
@@ -291,7 +298,11 @@ function LandingPage() {
                   <ConnectorDot name={c.name} />
                   Connect with {c.name}
                 </button>
-              ))}
+              )) : (
+                <button type="button" disabled className="inline-flex items-center gap-2 bg-white text-slate-900 font-semibold px-6 py-3 rounded-2xl shadow-lg opacity-80">
+                  Connect Wallet
+                </button>
+              )}
             </div>
             <p className="text-xs text-indigo-300">Non-custodial · Your keys, your funds</p>
           </div>

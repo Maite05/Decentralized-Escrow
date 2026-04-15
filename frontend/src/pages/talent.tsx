@@ -1,6 +1,6 @@
 import type { NextPage } from "next";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useActiveAddress } from "../hooks/useActiveAddress";
 import { Navbar } from "../components/Navbar";
 import { useTalentProfiles, type FreelancerProfile } from "../hooks/useJobs";
@@ -17,8 +17,11 @@ const SKILLS_FILTER = [
 ];
 
 const TalentMarketplace: NextPage = () => {
+  const [mounted, setMounted] = useState(false);
   const { address, isConnected } = useActiveAddress();
   const [search, setSearch] = useState("");
+
+  useEffect(() => { setMounted(true); }, []);
   const [skillFilter, setSkillFilter] = useState("");
   const [availFilter, setAvailFilter] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -48,7 +51,7 @@ const TalentMarketplace: NextPage = () => {
             <h1 className="text-2xl font-bold text-slate-900">Talent Marketplace</h1>
             <p className="text-sm text-slate-500">Find verified Web3 freelancers for your project</p>
           </div>
-          {isConnected && address && (
+          {mounted && isConnected && address && (
             <Link
               href={`/profile/${address.toLowerCase()}`}
               className="btn-primary shrink-0"
@@ -117,8 +120,8 @@ const TalentMarketplace: NextPage = () => {
           </div>
         </div>
 
-        {/* Results */}
-        {isLoading ? (
+        {/* Results — deferred until mounted to avoid SSR/client mismatch */}
+        {!mounted || isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="card p-5 animate-pulse space-y-3">
