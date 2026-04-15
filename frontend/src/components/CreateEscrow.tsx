@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useAccount } from "wagmi";
 import { decodeEventLog } from "viem";
 import { useEscrowWrite } from "../hooks/useEscrowWrite";
@@ -7,27 +8,32 @@ import { registerProject } from "../lib/backendSync";
 
 type Step = "idle" | "approving" | "deploying" | "done";
 
-export function CreateEscrow() {
+const STEPS = [
+  { key: "idle",      label: "Details",  desc: "Enter freelancer address and amount" },
+  { key: "approving", label: "Approve",  desc: "Allow the factory to spend your tokens" },
+  { key: "deploying", label: "Deploy",   desc: "Deploy the escrow contract on-chain" },
+] as const;
+
+interface CreateEscrowProps {
+  initialFreelancer?: string;
+  initialBudget?: string;
+}
+
+export function CreateEscrow({ initialFreelancer = "", initialBudget = "" }: CreateEscrowProps) {
   const [step, setStep] = useState<Step>("idle");
-  const [freelancer, setFreelancer] = useState("");
-  const [amountStr, setAmountStr] = useState("");
+  const [freelancer, setFreelancer] = useState(initialFreelancer);
+  const [amountStr, setAmountStr] = useState(initialBudget);
+  const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { address } = useAccount();
+  const { approveUSDC, createProject, receipt, isPending, isConfirming, isConfirmed, reset } =
+    useEscrowWrite();
 
-  const {
-    approveUSDC,
-    createProject,
-    receipt,
-    isPending,
-    isConfirming,
-    isConfirmed,
-    reset,
-  } = useEscrowWrite();
-
-  const isBusy = isPending || isConfirming;
   const amountWei = BigInt(Math.floor(parseFloat(amountStr || "0") * 1e18));
+  const isBusy = isPending || isConfirming;
 
-  // USDC approval confirmed → move to deploy step
+  // Step 1 confirmed → move to deploy
   useEffect(() => {
     if (isConfirmed && step === "approving") {
       setStep("deploying");
@@ -35,154 +41,204 @@ export function CreateEscrow() {
     }
   }, [isConfirmed, step, reset]);
 
-  // Deploy confirmed → parse event, sync to backend, mark done
+  // Step 2 confirmed → parse event, sync backend, show success
   useEffect(() => {
     if (!isConfirmed || step !== "deploying" || !receipt || !address) return;
 
-    let escrowAddress: string | undefined;
-
+    let escrowAddr: string | undefined;
     for (const log of receipt.logs) {
       try {
-        const decoded = decodeEventLog({
-          abi: FACTORY_ABI,
-          data: log.data,
-          topics: log.topics,
-          eventName: "ProjectCreated",
-        });
-        // ProjectCreated(projectId, escrow, client, freelancer, token, totalAmount)
-        escrowAddress = (decoded.args as { escrow: string }).escrow;
+        const decoded = decodeEventLog({ abi: FACTORY_ABI, data: log.data, topics: log.topics, eventName: "ProjectCreated" });
+        escrowAddr = (decoded.args as { escrow: string }).escrow;
         break;
-      } catch {
-        // log belongs to a different contract/event — skip
-      }
+      } catch { /* not this event */ }
     }
 
+    setDeployedAddress(escrowAddr ?? null);
     setStep("done");
 
-    if (escrowAddress) {
-      registerProject(
-        escrowAddress,
-        address,
-        freelancer,
-        amountWei.toString()
-      ).catch((err) =>
-        console.warn("[CreateEscrow] backend sync failed:", err)
-      );
+    if (escrowAddr) {
+      registerProject(escrowAddr, address, freelancer, amountWei.toString())
+        .catch((err) => console.warn("[CreateEscrow] backend sync failed:", err));
     }
   }, [isConfirmed, step, receipt, address, freelancer, amountWei]);
-
-  const handleApprove = () => {
-    if (!amountStr || amountWei === 0n) return;
-    setStep("approving");
-    approveUSDC(amountWei);
-  };
-
-  const handleCreate = () => {
-    if (!freelancer || amountWei === 0n) return;
-    createProject(freelancer as `0x${string}`, USDC_ADDRESS, amountWei);
-  };
 
   const handleReset = () => {
     setStep("idle");
     setFreelancer("");
     setAmountStr("");
+    setDeployedAddress(null);
     reset();
+  };
+
+  const copyAddress = () => {
+    if (deployedAddress) {
+      navigator.clipboard.writeText(deployedAddress);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   if (step === "done") {
     return (
-      <div className="space-y-4">
-        <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 font-medium">
-          Escrow created successfully!
+      <div className="card p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+            <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="font-bold text-slate-900">Escrow deployed!</h2>
+            <p className="text-sm text-slate-500">Your contract is live on-chain.</p>
+          </div>
         </div>
-        <button
-          onClick={handleReset}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-        >
-          Create another
-        </button>
+
+        {deployedAddress && (
+          <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Contract address</p>
+            <div className="flex items-center gap-2">
+              <code className="text-xs font-mono text-slate-700 flex-1 break-all">
+                {deployedAddress}
+              </code>
+              <button type="button" onClick={copyAddress}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium shrink-0">
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          {deployedAddress && (
+            <Link href={`/escrow/${deployedAddress}`} className="btn-primary flex-1 text-center">
+              Open project
+            </Link>
+          )}
+          <button type="button" onClick={handleReset} className="btn-secondary flex-1">
+            Create another
+          </button>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-5 max-w-md">
-      <h2 className="text-xl font-semibold text-gray-900">New Escrow Project</h2>
+  const currentStepIdx = STEPS.findIndex((s) => s.key === step);
 
+  return (
+    <div className="space-y-6">
       {/* Step indicator */}
-      <div className="flex gap-2 text-sm">
-        {(["idle", "approving", "deploying"] as Step[]).map((s, i) => (
-          <div key={s} className="flex items-center gap-1">
-            <span
-              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                step === s
-                  ? "bg-blue-600 text-white"
-                  : i < ["idle", "approving", "deploying"].indexOf(step)
-                  ? "bg-green-500 text-white"
-                  : "bg-gray-200 text-gray-500"
-              }`}
-            >
-              {i + 1}
-            </span>
-            <span className="text-gray-600 capitalize">
-              {s === "idle" ? "Details" : s === "approving" ? "Approve" : "Deploy"}
-            </span>
-            {i < 2 && <span className="text-gray-300 ml-1">→</span>}
-          </div>
-        ))}
+      <div className="card p-4">
+        <div className="flex items-center">
+          {STEPS.map((s, i) => {
+            const done = i < currentStepIdx;
+            const active = s.key === step;
+            return (
+              <div key={s.key} className="flex items-center flex-1 last:flex-none">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+                    ${done ? "bg-emerald-500 text-white" : active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>
+                    {done ? (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : i + 1}
+                  </div>
+                  <span className={`text-sm font-medium hidden sm:block ${active ? "text-slate-900" : "text-slate-400"}`}>
+                    {s.label}
+                  </span>
+                </div>
+                {i < STEPS.length - 1 && (
+                  <div className={`flex-1 h-0.5 mx-3 ${done ? "bg-emerald-300" : "bg-slate-100"}`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-xs text-slate-500 mt-3">
+          {STEPS[currentStepIdx]?.desc}
+        </p>
       </div>
 
-      <input
-        type="text"
-        placeholder="Freelancer address (0x…)"
-        value={freelancer}
-        onChange={(e) => setFreelancer(e.target.value)}
-        disabled={step !== "idle"}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
-      />
-
-      <input
-        type="number"
-        placeholder="Amount (USDC)"
-        min="0"
-        value={amountStr}
-        onChange={(e) => setAmountStr(e.target.value)}
-        disabled={step !== "idle"}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
-      />
-
-      {step === "idle" && (
-        <button
-          onClick={handleApprove}
-          disabled={!freelancer || !amountStr || amountWei === 0n}
-          className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
-        >
-          Step 1: Approve USDC
-        </button>
-      )}
-
-      {step === "approving" && (
-        <div className="space-y-2">
-          {isBusy ? (
-            <p className="text-sm text-gray-500 animate-pulse">
-              Waiting for approval confirmation…
-            </p>
-          ) : (
-            <button
-              onClick={handleCreate}
-              className="w-full py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
-            >
-              Step 2: Deploy Escrow
-            </button>
-          )}
+      {/* Form */}
+      <div className="card p-6 space-y-5">
+        <div>
+          <label className="label" htmlFor="freelancer">Freelancer wallet address</label>
+          <input
+            id="freelancer"
+            type="text"
+            placeholder="0x…"
+            value={freelancer}
+            onChange={(e) => setFreelancer(e.target.value)}
+            disabled={step !== "idle"}
+            className="input font-mono"
+          />
         </div>
-      )}
 
-      {step === "deploying" && isBusy && (
-        <p className="text-sm text-gray-500 animate-pulse">
-          Deploying escrow contract…
-        </p>
-      )}
+        <div>
+          <label className="label" htmlFor="amount">Total budget</label>
+          <div className="relative">
+            <input
+              id="amount"
+              type="number"
+              placeholder="0.00"
+              min="0"
+              value={amountStr}
+              onChange={(e) => setAmountStr(e.target.value)}
+              disabled={step !== "idle"}
+              className="input pr-16"
+            />
+            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">
+              USDC
+            </span>
+          </div>
+        </div>
+
+        {step === "idle" && (
+          <button type="button" onClick={() => {
+            if (!amountStr || amountWei === 0n) return;
+            setStep("approving");
+            approveUSDC(amountWei);
+          }}
+            disabled={!freelancer || !amountStr || amountWei === 0n}
+            className="btn-primary w-full py-3"
+          >
+            Approve USDC →
+          </button>
+        )}
+
+        {step === "approving" && (
+          isBusy ? (
+            <div className="flex items-center gap-2 text-sm text-slate-500 py-3 justify-center">
+              <Spinner />
+              Waiting for approval confirmation…
+            </div>
+          ) : (
+            <button type="button"
+              onClick={() => createProject(freelancer as `0x${string}`, USDC_ADDRESS, amountWei)}
+              className="btn-success w-full py-3"
+            >
+              Deploy Escrow Contract →
+            </button>
+          )
+        )}
+
+        {step === "deploying" && (
+          <div className="flex items-center gap-2 text-sm text-slate-500 py-3 justify-center">
+            <Spinner />
+            {isPending ? "Confirm in your wallet…" : "Deploying contract…"}
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg className="w-4 h-4 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
   );
 }
