@@ -26,7 +26,10 @@ export function WalletButton() {
   } = useWallet();
 
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -35,6 +38,14 @@ export function WalletButton() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  if (!mounted) {
+    return (
+      <button type="button" disabled className="btn-primary text-sm opacity-0 pointer-events-none">
+        Connect Wallet
+      </button>
+    );
+  }
 
   if (isConnected && isWrongChain) {
     return (
